@@ -2,11 +2,11 @@ mod firewall {
     include!(concat!(env!("OUT_DIR"), "/cgroup_fw.skel.rs"));
 }
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
+use ctnctl_rs::utils;
 use firewall::*;
 use libbpf_rs::MapFlags;
-use libc;
 use std::net::Ipv4Addr;
 use std::os::fd::AsRawFd;
 use std::str::FromStr;
@@ -41,7 +41,7 @@ fn main() -> Result<()> {
             println!("[DEBUG] block -e {:?} {:?}", egress, container_name);
 
             let builder = CgroupFwSkelBuilder::default();
-            increase_rlimit()?;
+            utils::increase_rlimit()?;
             // Get an opened, pre-load bpf object
             let open = builder.open()?;
             // Get a loaded bpf object
@@ -82,18 +82,5 @@ fn main() -> Result<()> {
         }
     }
     println!("Done");
-    Ok(())
-}
-
-fn increase_rlimit() -> Result<()> {
-    let rl = libc::rlimit {
-        rlim_cur: 1 << 20,
-        rlim_max: 1 << 20,
-    };
-
-    if unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rl) } != 0 {
-        bail!("Error increasing rlimit");
-    }
-
     Ok(())
 }
