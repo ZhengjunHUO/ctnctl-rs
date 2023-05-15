@@ -7,9 +7,6 @@ use clap::{Parser, Subcommand};
 use ctnctl_rs::utils;
 use firewall::*;
 use libbpf_rs::MapFlags;
-use std::net::Ipv4Addr;
-use std::os::fd::AsRawFd;
-use std::str::FromStr;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -48,14 +45,7 @@ fn main() -> Result<()> {
             let mut obj = open.load()?;
 
             // Get target cgroup id
-            let f = std::fs::OpenOptions::new()
-                .read(true)
-                .write(false)
-                .open(format!(
-                    "/sys/fs/cgroup/system.slice/docker-{}.scope",
-                    container_name
-                ))?;
-            let cgroup_fd = f.as_raw_fd();
+            let cgroup_fd = utils::get_ctn_cgroup_fd(&container_name)?;
 
             // Get loaded program and attach to the cgroup
             let mut eg_link = obj.progs_mut().egress_filter().attach_cgroup(cgroup_fd)?;
@@ -72,8 +62,7 @@ fn main() -> Result<()> {
             eg_fw_map.pin("/sys/fs/bpf/cgroup_egs_map")?;
 
             // Apply a rule
-            let ip_parsed = Ipv4Addr::from_str(&egress)?;
-            let key = u32::from(ip_parsed).to_be_bytes();
+            let key = utils::ipv4_to_u32(&egress)?;
             let value = u8::from(true).to_ne_bytes();
             eg_fw_map.update(&key, &value, MapFlags::ANY)?;
         }
