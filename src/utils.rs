@@ -2,11 +2,10 @@ mod firewall {
     include!(concat!(env!("OUT_DIR"), "/cgroup_fw.skel.rs"));
 }
 
+use super::{BPF_PATH, EGRESS_LINK_NAME, EGRESS_MAP_NAME};
 use anyhow::{bail, Result};
 use firewall::*;
 use std::os::fd::AsRawFd;
-
-const BPF_PATH: &str = "/sys/fs/bpf";
 
 pub fn increase_rlimit() -> Result<()> {
     let rl = libc::rlimit {
@@ -51,20 +50,19 @@ pub fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
             ctn_id
         ))?;
     let cgroup_fd = f.as_raw_fd();
-    println!("[DEBUG] file descriptor: {:?}", cgroup_fd);
 
     // (2.a) Get loaded programs and attach to the cgroup, then pin to the fs
     let mut eg_link = obj.progs_mut().egress_filter().attach_cgroup(cgroup_fd)?;
     // The prog_type and attach_type are inferred from the c program
     // should be CgroupInetEgress here
     //println!("[DEBUG]: Attach type is {:?}", obj.progs().egress_filter().attach_type());
-    eg_link.pin(format!("{}/{}", &ctn_dir, "cgroup_egs_link"))?;
+    eg_link.pin(format!("{}/{}", &ctn_dir, EGRESS_LINK_NAME))?;
 
     // (2.b) Get loaded maps and pin to the fs
     let mut maps = obj.maps_mut();
     let eg_fw_map = maps.egress_blacklist();
     // Persist the map on bpf vfs
-    eg_fw_map.pin(format!("{}/{}", &ctn_dir, "cgroup_egs_map"))?;
+    eg_fw_map.pin(format!("{}/{}", &ctn_dir, EGRESS_MAP_NAME))?;
 
     Ok(())
 }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use ctnctl_rs::utils;
+use ctnctl_rs::{utils, BPF_PATH, EGRESS_MAP_NAME};
 use libbpf_rs::{Map, MapFlags};
 
 #[derive(Parser)]
@@ -38,7 +38,7 @@ fn main() -> Result<()> {
             // Open the pinned map for egress rules inside the container's folder
             let eg_fw_map = Map::from_pinned_path(format!(
                 "{}/{}/{}",
-                "/sys/fs/bpf", &container_name, "cgroup_egs_map"
+                BPF_PATH, &container_name, EGRESS_MAP_NAME
             ))?;
 
             // Apply the firewall rule
@@ -50,6 +50,6 @@ fn main() -> Result<()> {
             println!("[DEBUG] clear {:?}", container_name)
         }
     }
-    println!("Done");
+    println!("[DEBUG] Done");
     Ok(())
 }
