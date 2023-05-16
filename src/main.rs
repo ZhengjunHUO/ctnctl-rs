@@ -1,12 +1,7 @@
-mod firewall {
-    include!(concat!(env!("OUT_DIR"), "/cgroup_fw.skel.rs"));
-}
-
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use ctnctl_rs::utils;
-use firewall::*;
-use libbpf_rs::MapFlags;
+use libbpf_rs::{Map, MapFlags};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -37,31 +32,16 @@ fn main() -> Result<()> {
         } => {
             println!("[DEBUG] block -e {:?} {:?}", egress, container_name);
 
-            let builder = CgroupFwSkelBuilder::default();
-            utils::increase_rlimit()?;
-            // Get an opened, pre-load bpf object
-            let open = builder.open()?;
-            // Get a loaded bpf object
-            let mut obj = open.load()?;
+            // Create a folder and store the pinned maps for the container if not exist yet
+            utils::prepare_ctn_dir(&container_name)?;
 
-            // Get target cgroup id
-            let cgroup_fd = utils::get_ctn_cgroup_fd(&container_name)?;
+            // Open the pinned map for egress rules inside the container's folder
+            let eg_fw_map = Map::from_pinned_path(format!(
+                "{}/{}/{}",
+                "/sys/fs/bpf", &container_name, "cgroup_egs_map"
+            ))?;
 
-            // Get loaded program and attach to the cgroup
-            let mut eg_link = obj.progs_mut().egress_filter().attach_cgroup(cgroup_fd)?;
-            // The prog_type and attach_type are inferred from the c program
-            // should be CgroupInetEgress here
-            //println!("[DEBUG]: Attach type is {:?}", obj.progs().egress_filter().attach_type());
-            eg_link.pin("/sys/fs/bpf/cgroup_egs_link")?;
-
-            // Get loaded map
-            let mut maps = obj.maps_mut();
-            let eg_fw_map = maps.egress_blacklist();
-
-            // Persist the map on bpf vfs
-            eg_fw_map.pin("/sys/fs/bpf/cgroup_egs_map")?;
-
-            // Apply a rule
+            // Apply the firewall rule
             let key = utils::ipv4_to_u32(&egress)?;
             let value = u8::from(true).to_ne_bytes();
             eg_fw_map.update(&key, &value, MapFlags::ANY)?;
