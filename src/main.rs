@@ -47,7 +47,8 @@ fn main() -> Result<()> {
             eg_fw_map.update(&key, &value, MapFlags::ANY)?;
         }
         Commands::Clear { container_name } => {
-            println!("[DEBUG] clear {:?}", container_name)
+            println!("[DEBUG] clear {:?}", container_name);
+            utils::free_ctn_resources(&container_name)?;
         }
     }
     println!("[DEBUG] Done");

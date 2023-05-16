@@ -5,7 +5,9 @@ mod firewall {
 use super::{BPF_PATH, EGRESS_LINK_NAME, EGRESS_MAP_NAME};
 use anyhow::{bail, Result};
 use firewall::*;
+use libbpf_rs::{Link, Map};
 use std::os::fd::AsRawFd;
+use std::path::Path;
 
 pub fn increase_rlimit() -> Result<()> {
     let rl = libc::rlimit {
@@ -21,13 +23,14 @@ pub fn increase_rlimit() -> Result<()> {
 }
 
 pub fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
-    use std::{fs::create_dir, path::Path};
+    use std::fs::create_dir;
 
     // (1) Create dir for container
     let ctn_dir = format!("{}/{}", BPF_PATH, ctn_id);
     let ctn_dir_path = Path::new(&ctn_dir);
     if ctn_dir_path.is_dir() {
         // return if the dir is already there
+        println!("[DEBUG] Dir {:?} already exists.", ctn_dir_path);
         return Ok(());
     }
 
@@ -73,4 +76,37 @@ pub fn ipv4_to_u32(ip: &str) -> Result<[u8; 4]> {
 
     let ip_parsed = Ipv4Addr::from_str(ip)?;
     Ok(u32::from(ip_parsed).to_be_bytes())
+}
+
+pub fn free_ctn_resources(ctn_id: &str) -> Result<()> {
+    use std::fs::remove_dir;
+
+    let ctn_dir = format!("{}/{}", BPF_PATH, ctn_id);
+    let ctn_dir_path = Path::new(&ctn_dir);
+    if !ctn_dir_path.try_exists()? {
+        // return if the dir is already there
+        println!("[DEBUG] Dir {:?} already deleted.", ctn_dir_path);
+        return Ok(());
+    }
+
+    let all_links = vec![EGRESS_LINK_NAME];
+    let all_maps = vec![EGRESS_MAP_NAME];
+
+    for l in all_links {
+        let path = format!("{}/{}", ctn_dir, l);
+        let mut prog = Link::open(path)?;
+        prog.unpin()?;
+        println!("[DEBUG] Unpinned link {}", l);
+    }
+
+    for m in all_maps {
+        let path = format!("{}/{}", ctn_dir, m);
+        let mut map = Map::from_pinned_path(&path)?;
+        map.unpin(&path)?;
+        println!("[DEBUG] Unpinned map {}", m);
+    }
+
+    remove_dir(ctn_dir_path)?;
+
+    Ok(())
 }
