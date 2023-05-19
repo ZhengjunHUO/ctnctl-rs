@@ -92,6 +92,7 @@ pub fn free_ctn_resources(ctn_id: &str) -> Result<()> {
     let all_links = vec![EGRESS_LINK_NAME];
     let all_maps = vec![EGRESS_MAP_NAME];
 
+    // if link is unpinned and map stays, the rules will not applied any more.
     for l in all_links {
         let path = format!("{}/{}", ctn_dir, l);
         let mut prog = Link::open(path)?;
@@ -99,6 +100,7 @@ pub fn free_ctn_resources(ctn_id: &str) -> Result<()> {
         println!("[DEBUG] Unpinned link {}", l);
     }
 
+    // if map is unpinned and link stays, the rules is still in effect ?!
     for m in all_maps {
         let path = format!("{}/{}", ctn_dir, m);
         let mut map = Map::from_pinned_path(&path)?;
