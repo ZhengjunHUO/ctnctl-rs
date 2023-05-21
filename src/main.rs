@@ -26,13 +26,13 @@ enum Commands {
 #[derive(Args, Debug)]
 #[group(required = true, multiple = false)]
 struct Direction {
-    /// Egress IP to be blocked
-    #[clap(short, long, value_name = "IP")]
-    egress: Option<String>,
+    /// Disallow container to visit an external IP
+    #[clap(long, value_name = "IP")]
+    to: Option<String>,
 
-    /// Ingress IP to be blocked
-    #[clap(short, long, value_name = "IP")]
-    ingress: Option<String>,
+    /// Prevent remote IP from visiting container
+    #[clap(long, value_name = "IP")]
+    from: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -45,9 +45,9 @@ fn main() -> Result<()> {
             // Create a folder and store the pinned maps for the container if not exist yet
             utils::prepare_ctn_dir(&container_name)?;
 
-            match (&direction.egress, &direction.ingress) {
+            match (&direction.to, &direction.from) {
                 (Some(eg), None) => {
-                    println!("[DEBUG] egress {:?}", eg);
+                    //println!("[DEBUG] egress {:?}", eg);
 
                     // Open the pinned map for egress rules inside the container's folder
                     let eg_fw_map = Map::from_pinned_path(format!(
@@ -61,9 +61,9 @@ fn main() -> Result<()> {
                     eg_fw_map.update(&key, &value, MapFlags::ANY)?;
                 }
                 (None, Some(ing)) => {
-                    println!("[DEBUG] igress {:?}", ing);
+                    //println!("[DEBUG] igress {:?}", ing);
 
-                    // Open the pinned map for egress rules inside the container's folder
+                    // Open the pinned map for ingress rules inside the container's folder
                     let ig_fw_map = Map::from_pinned_path(format!(
                         "{}/{}/{}",
                         BPF_PATH, &container_name, INGRESS_MAP_NAME
