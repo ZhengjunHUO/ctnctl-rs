@@ -2,7 +2,7 @@ mod firewall {
     include!(concat!(env!("OUT_DIR"), "/cgroup_fw.skel.rs"));
 }
 
-use super::{BPF_PATH, EGRESS_LINK_NAME, EGRESS_MAP_NAME};
+use super::{BPF_PATH, EGRESS_LINK_NAME, EGRESS_MAP_NAME, INGRESS_LINK_NAME, INGRESS_MAP_NAME};
 use anyhow::{bail, Result};
 use firewall::*;
 use libbpf_rs::{Link, Map};
@@ -61,11 +61,18 @@ pub fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
     //println!("[DEBUG]: Attach type is {:?}", obj.progs().egress_filter().attach_type());
     eg_link.pin(format!("{}/{}", &ctn_dir, EGRESS_LINK_NAME))?;
 
+    let mut ig_link = obj.progs_mut().ingress_filter().attach_cgroup(cgroup_fd)?;
+    ig_link.pin(format!("{}/{}", &ctn_dir, INGRESS_LINK_NAME))?;
+
     // (2.b) Get loaded maps and pin to the fs
     let mut maps = obj.maps_mut();
+
     let eg_fw_map = maps.egress_blacklist();
     // Persist the map on bpf vfs
     eg_fw_map.pin(format!("{}/{}", &ctn_dir, EGRESS_MAP_NAME))?;
+
+    let ig_fw_map = maps.ingress_blacklist();
+    ig_fw_map.pin(format!("{}/{}", &ctn_dir, INGRESS_MAP_NAME))?;
 
     Ok(())
 }
@@ -89,8 +96,8 @@ pub fn free_ctn_resources(ctn_id: &str) -> Result<()> {
         return Ok(());
     }
 
-    let all_links = vec![EGRESS_LINK_NAME];
-    let all_maps = vec![EGRESS_MAP_NAME];
+    let all_links = vec![EGRESS_LINK_NAME, INGRESS_LINK_NAME];
+    let all_maps = vec![EGRESS_MAP_NAME, INGRESS_MAP_NAME];
 
     // if link is unpinned and map stays, the rules will not applied any more.
     for l in all_links {
