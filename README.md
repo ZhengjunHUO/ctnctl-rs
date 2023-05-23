@@ -28,10 +28,14 @@ Options:
   -V, --version  Print version
 
 # Block container from visiting some IP
-$ sudo ./target/debug/ctnctl-rs block --to 8.8.4.4 252491db736e3ece6bccbb019c2953d4fa4907f3ba3e3742b00913674fc3e45a
+$ sudo ./target/debug/ctnctl-rs block --to 8.8.4.4 ctn1
 # Blacklist some remote IP to visit target container
-$ sudo ./target/debug/ctnctl-rs block --from 172.17.0.2 058783c611667d2f7de73024eeb79c6b05c3d58da2c087e2e479653b827b9c86
+$ sudo ./target/debug/ctnctl-rs block --from 172.17.0.2 ctn2
 
 # Remove all rules applied to the container
-$ sudo ./target/debug/ctnctl-rs clear 252491db736e3ece6bccbb019c2953d4fa4907f3ba3e3742b00913674fc3e45a
+$ sudo ./target/debug/ctnctl-rs clear ctn1
+
+# When container doesn't exist
+$ sudo ./target/debug/ctnctl-rs clear rust
+Error: Container rust not found !
 ```
