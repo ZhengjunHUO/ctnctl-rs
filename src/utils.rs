@@ -6,7 +6,6 @@ use super::{BPF_PATH, EGRESS_LINK_NAME, EGRESS_MAP_NAME, INGRESS_LINK_NAME, INGR
 use anyhow::{bail, Result};
 use firewall::*;
 use libbpf_rs::{Link, Map};
-use std::os::fd::AsRawFd;
 use std::path::Path;
 
 pub fn increase_rlimit() -> Result<()> {
@@ -24,6 +23,7 @@ pub fn increase_rlimit() -> Result<()> {
 
 pub fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
     use std::fs::create_dir;
+    use std::os::fd::AsRawFd;
 
     // (1) Create dir for container
     let ctn_dir = format!("{}/{}", BPF_PATH, ctn_id);
@@ -118,4 +118,36 @@ pub fn free_ctn_resources(ctn_id: &str) -> Result<()> {
     remove_dir(ctn_dir_path)?;
 
     Ok(())
+}
+
+pub fn get_ctn_id_from_name(ctn_name: &str) -> Result<String> {
+    use docker_api::opts::{ContainerFilter, ContainerListOpts};
+    use docker_api::Docker;
+    use tokio::runtime::Runtime;
+
+    let rt = Runtime::new().unwrap();
+    let docker = Docker::new("unix:///var/run/docker.sock").unwrap();
+
+    rt.block_on(async {
+        match docker
+            .containers()
+            .list(
+                &ContainerListOpts::builder()
+                    .filter(vec![ContainerFilter::Name(ctn_name.to_string())])
+                    .build(),
+            )
+            .await
+        {
+            Ok(ctns) => {
+                if ctns.len() < 1 {
+                    bail!("Container {} not found !", ctn_name);
+                }
+
+                let ctn_id = ctns[0].id.clone().unwrap();
+                println!("[DEBUG] Found container {}'s ID: {}", ctn_name, ctn_id);
+                Ok(ctn_id)
+            }
+            Err(e) => bail!("Error retrieving container {}'s ID: {}", ctn_name, e),
+        }
+    })
 }

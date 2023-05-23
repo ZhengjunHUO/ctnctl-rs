@@ -43,17 +43,16 @@ fn main() -> Result<()> {
             container_name,
         } => {
             // Create a folder and store the pinned maps for the container if not exist yet
-            utils::prepare_ctn_dir(&container_name)?;
+            let id = utils::get_ctn_id_from_name(&container_name)?;
+            utils::prepare_ctn_dir(&id)?;
 
             match (&direction.to, &direction.from) {
                 (Some(eg), None) => {
                     //println!("[DEBUG] egress {:?}", eg);
 
                     // Open the pinned map for egress rules inside the container's folder
-                    let eg_fw_map = Map::from_pinned_path(format!(
-                        "{}/{}/{}",
-                        BPF_PATH, &container_name, EGRESS_MAP_NAME
-                    ))?;
+                    let eg_fw_map =
+                        Map::from_pinned_path(format!("{}/{}/{}", BPF_PATH, &id, EGRESS_MAP_NAME))?;
 
                     // Apply the firewall rule
                     let key = utils::ipv4_to_u32(&eg)?;
@@ -66,7 +65,7 @@ fn main() -> Result<()> {
                     // Open the pinned map for ingress rules inside the container's folder
                     let ig_fw_map = Map::from_pinned_path(format!(
                         "{}/{}/{}",
-                        BPF_PATH, &container_name, INGRESS_MAP_NAME
+                        BPF_PATH, &id, INGRESS_MAP_NAME
                     ))?;
 
                     // Apply the firewall rule
@@ -78,8 +77,9 @@ fn main() -> Result<()> {
             };
         }
         Commands::Clear { container_name } => {
-            println!("[DEBUG] clear {:?}", container_name);
-            utils::free_ctn_resources(&container_name)?;
+            let id = utils::get_ctn_id_from_name(&container_name)?;
+            println!("[DEBUG] clear {:?}", id);
+            utils::free_ctn_resources(&id)?;
         }
     }
     println!("[DEBUG] Done");

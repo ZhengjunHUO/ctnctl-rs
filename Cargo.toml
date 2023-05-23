@@ -8,8 +8,10 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.71"
 clap = { version = "4.2.7", features = ["derive"] }
+docker-api = "0.12.2"
 libbpf-rs = "0.20.1"
 libc = "0.2.142"
+tokio = "1.28.1"
 
 [build-dependencies]
 libbpf-cargo = "0.20.1"
