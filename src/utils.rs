@@ -6,6 +6,7 @@ use super::{BPF_PATH, EGRESS_LINK_NAME, EGRESS_MAP_NAME, INGRESS_LINK_NAME, INGR
 use anyhow::{bail, Result};
 use firewall::*;
 use libbpf_rs::{Link, Map};
+use std::net::Ipv4Addr;
 use std::path::Path;
 
 pub fn increase_rlimit() -> Result<()> {
@@ -26,7 +27,7 @@ pub fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
     use std::os::fd::AsRawFd;
 
     // (1) Create dir for container
-    let ctn_dir = format!("{}/{}", BPF_PATH, ctn_id);
+    let ctn_dir = get_ctn_bpf_path(ctn_id);
     let ctn_dir_path = Path::new(&ctn_dir);
     if ctn_dir_path.is_dir() {
         // return if the dir is already there
@@ -78,17 +79,33 @@ pub fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
 }
 
 pub fn ipv4_to_u32(ip: &str) -> Result<[u8; 4]> {
-    use std::net::Ipv4Addr;
     use std::str::FromStr;
 
     let ip_parsed = Ipv4Addr::from_str(ip)?;
     Ok(u32::from(ip_parsed).to_be_bytes())
 }
 
+pub fn u32_to_ipv4(v: Vec<u8>) -> Result<String> {
+    if v.len() != 4 {
+        bail!("Unexpected key stored in the map: {:?}", v)
+    }
+
+    let ip = Ipv4Addr::from([v[0], v[1], v[2], v[3]]);
+    Ok(ip.to_string())
+}
+
+fn get_all_maps() -> Vec<&'static str> {
+    vec![EGRESS_MAP_NAME, INGRESS_MAP_NAME]
+}
+
+fn get_ctn_bpf_path(ctn_id: &str) -> String {
+    format!("{}/{}", BPF_PATH, ctn_id)
+}
+
 pub fn free_ctn_resources(ctn_id: &str) -> Result<()> {
     use std::fs::remove_dir;
 
-    let ctn_dir = format!("{}/{}", BPF_PATH, ctn_id);
+    let ctn_dir = get_ctn_bpf_path(ctn_id);
     let ctn_dir_path = Path::new(&ctn_dir);
     if !ctn_dir_path.try_exists()? {
         // return if the dir is already there
@@ -97,7 +114,7 @@ pub fn free_ctn_resources(ctn_id: &str) -> Result<()> {
     }
 
     let all_links = vec![EGRESS_LINK_NAME, INGRESS_LINK_NAME];
-    let all_maps = vec![EGRESS_MAP_NAME, INGRESS_MAP_NAME];
+    let all_maps = get_all_maps();
 
     // if link is unpinned and map stays, the rules will not applied any more.
     for l in all_links {
@@ -117,6 +134,34 @@ pub fn free_ctn_resources(ctn_id: &str) -> Result<()> {
 
     remove_dir(ctn_dir_path)?;
 
+    Ok(())
+}
+
+pub fn show_rules(ctn_id: &str) -> Result<()> {
+    //use libbpf_rs::MapFlags;
+    let ctn_dir = get_ctn_bpf_path(ctn_id);
+
+    let ctn_dir_path = Path::new(&ctn_dir);
+    if !ctn_dir_path.try_exists()? {
+        // return if the dir doesn't exist
+        println!("[DEBUG] No rules applied.");
+        return Ok(());
+    }
+
+    let all_maps = get_all_maps();
+    for m in all_maps {
+        println!("[DEBUG] Rules in {}", m);
+        let path = format!("{}/{}", ctn_dir, m);
+        let map = Map::from_pinned_path(&path)?;
+
+        for key in map.keys() {
+            // print the key, the value is always 1 (true) here
+            //let value = map.lookup(&key, MapFlags::ANY)?;
+            //println!("  {:?}", value.unwrap())
+
+            println!("  {:?}", u32_to_ipv4(key)?)
+        }
+    }
     Ok(())
 }
 

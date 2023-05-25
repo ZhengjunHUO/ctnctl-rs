@@ -19,6 +19,8 @@ enum Commands {
         direction: Direction,
         container_name: String,
     },
+    /// Print firewall rules applied to container
+    Show { container_name: String },
     /// Remove container's all firewall rules
     Clear { container_name: String },
 }
@@ -76,9 +78,12 @@ fn main() -> Result<()> {
                 _ => unreachable!(),
             };
         }
+        Commands::Show { container_name } => {
+            let id = utils::get_ctn_id_from_name(&container_name)?;
+            utils::show_rules(&id)?;
+        }
         Commands::Clear { container_name } => {
             let id = utils::get_ctn_id_from_name(&container_name)?;
-            println!("[DEBUG] clear {:?}", id);
             utils::free_ctn_resources(&id)?;
         }
     }
