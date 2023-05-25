@@ -14,12 +14,13 @@ $ cargo build
 
 ## Run
 ```
-# Show help info
-$ ./target/debug/ctnctl-rs -h
+# Usage
+$ sudo ./target/debug/ctnctl-rs -h
 Usage: ctnctl-rs <COMMAND>
 
 Commands:
   block  Add IP to container's blacklist
+  show   Print firewall rules applied to container
   clear  Remove container's all firewall rules
   help   Print this message or the help of the given subcommand(s)
 
