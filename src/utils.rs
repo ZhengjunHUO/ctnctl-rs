@@ -102,10 +102,11 @@ fn get_ctn_bpf_path(ctn_id: &str) -> String {
     format!("{}/{}", BPF_PATH, ctn_id)
 }
 
-pub fn free_ctn_resources(ctn_id: &str) -> Result<()> {
+pub fn free_ctn_resources(ctn_name: &str) -> Result<()> {
     use std::fs::remove_dir;
 
-    let ctn_dir = get_ctn_bpf_path(ctn_id);
+    let ctn_id = get_ctn_id_from_name(&ctn_name)?;
+    let ctn_dir = get_ctn_bpf_path(&ctn_id);
     let ctn_dir_path = Path::new(&ctn_dir);
     if !ctn_dir_path.try_exists()? {
         // return if the dir is already there
@@ -137,9 +138,11 @@ pub fn free_ctn_resources(ctn_id: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn show_rules(ctn_id: &str) -> Result<()> {
+pub fn show_rules(ctn_name: &str) -> Result<()> {
+    let ctn_id = get_ctn_id_from_name(&ctn_name)?;
+
     //use libbpf_rs::MapFlags;
-    let ctn_dir = get_ctn_bpf_path(ctn_id);
+    let ctn_dir = get_ctn_bpf_path(&ctn_id);
 
     let ctn_dir_path = Path::new(&ctn_dir);
     if !ctn_dir_path.try_exists()? {

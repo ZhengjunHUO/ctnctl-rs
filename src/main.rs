@@ -92,12 +92,10 @@ fn main() -> Result<()> {
             };
         }
         Commands::Show => {
-            let id = utils::get_ctn_id_from_name(&ctn_name)?;
-            utils::show_rules(&id)?;
+            utils::show_rules(&ctn_name)?;
         }
         Commands::Clear => {
-            let id = utils::get_ctn_id_from_name(&ctn_name)?;
-            utils::free_ctn_resources(&id)?;
+            utils::free_ctn_resources(&ctn_name)?;
         }
     }
     println!("[DEBUG] Done");
