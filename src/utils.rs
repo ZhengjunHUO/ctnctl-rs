@@ -13,11 +13,11 @@ use std::path::Path;
 #[derive(Args, Debug)]
 #[group(required = true, multiple = false)]
 pub struct Direction {
-    /// Disallow container to visit an external IP
+    /// visit an external IP from container
     #[clap(long, value_name = "IP")]
     to: Option<String>,
 
-    /// Prevent remote IP from visiting container
+    /// be visited from a remote IP
     #[clap(long, value_name = "IP")]
     from: Option<String>,
 }

@@ -15,23 +15,31 @@ $ cargo build
 ## Run
 ```
 # Usage
-$ sudo ./target/debug/ctnctl-rs -h
-Usage: ctnctl-rs <COMMAND>
+$ sudo ./target/debug/ctnctl-rs block -h
+Add IP to container's blacklist
 
-Commands:
-  block  Add IP to container's blacklist
-  show   Print firewall rules applied to container
-  clear  Remove container's all firewall rules
-  help   Print this message or the help of the given subcommand(s)
+Usage: ctnctl-rs block <--to <IP>|--from <IP>> [CONTAINER_NAME]
+
+Arguments:
+  [CONTAINER_NAME]  
 
 Options:
-  -h, --help     Print help
-  -V, --version  Print version
+      --to <IP>    visit an external IP from container
+      --from <IP>  be visited from a remote IP
+  -h, --help       Print help
+  -V, --version    Print version
 
 # Block container from visiting some IP
 $ sudo ./target/debug/ctnctl-rs block --to 8.8.4.4 ctn1
 # Blacklist some remote IP to visit target container
 $ sudo ./target/debug/ctnctl-rs block --from 172.17.0.2 ctn2
+
+# Show active rules
+$ sudo ./target/debug/ctnctl-rs show ctn1
+Egress (to) firewall rules: 
+  - 8.8.4.4
+
+Ingress (from) firewall rules: 
 
 # Remove all rules applied to the container
 $ sudo ./target/debug/ctnctl-rs clear ctn1

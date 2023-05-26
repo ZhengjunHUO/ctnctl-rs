@@ -20,6 +20,7 @@ enum Commands {
         #[command(flatten)]
         direction: utils::Direction,
     },
+    /// Remove IP from container's blacklist
     Unblock {
         #[command(flatten)]
         direction: utils::Direction,
