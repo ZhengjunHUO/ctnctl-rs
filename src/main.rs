@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, CommandFactory, Parser, Subcommand};
 use ctnctl_rs::{utils, BPF_PATH, EGRESS_MAP_NAME, INGRESS_MAP_NAME};
 use libbpf_rs::{Map, MapFlags};
 
@@ -9,6 +9,9 @@ use libbpf_rs::{Map, MapFlags};
 struct Cli {
     #[command(subcommand)]
     subcommand: Commands,
+
+    #[arg(global = true, required = false)]
+    container_name: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -17,12 +20,11 @@ enum Commands {
     Block {
         #[command(flatten)]
         direction: Direction,
-        container_name: String,
     },
     /// Print firewall rules applied to container
-    Show { container_name: String },
+    Show,
     /// Remove container's all firewall rules
-    Clear { container_name: String },
+    Clear,
 }
 
 #[derive(Args, Debug)]
@@ -39,13 +41,24 @@ struct Direction {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    let ctn_name;
+
+    match cli.container_name {
+        Some(name) => ctn_name = name,
+        None => {
+            let mut cmmd = Cli::command();
+            cmmd.error(
+                clap::error::ErrorKind::MissingRequiredArgument,
+                "<CONTAINER_NAME> is required",
+            )
+            .exit();
+        }
+    }
+
     match &cli.subcommand {
-        Commands::Block {
-            direction,
-            container_name,
-        } => {
+        Commands::Block { direction } => {
             // Create a folder and store the pinned maps for the container if not exist yet
-            let id = utils::get_ctn_id_from_name(&container_name)?;
+            let id = utils::get_ctn_id_from_name(&ctn_name)?;
             utils::prepare_ctn_dir(&id)?;
 
             match (&direction.to, &direction.from) {
@@ -78,12 +91,12 @@ fn main() -> Result<()> {
                 _ => unreachable!(),
             };
         }
-        Commands::Show { container_name } => {
-            let id = utils::get_ctn_id_from_name(&container_name)?;
+        Commands::Show => {
+            let id = utils::get_ctn_id_from_name(&ctn_name)?;
             utils::show_rules(&id)?;
         }
-        Commands::Clear { container_name } => {
-            let id = utils::get_ctn_id_from_name(&container_name)?;
+        Commands::Clear => {
+            let id = utils::get_ctn_id_from_name(&ctn_name)?;
             utils::free_ctn_resources(&id)?;
         }
     }
