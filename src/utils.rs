@@ -4,10 +4,23 @@ mod firewall {
 
 use super::{BPF_PATH, EGRESS_LINK_NAME, EGRESS_MAP_NAME, INGRESS_LINK_NAME, INGRESS_MAP_NAME};
 use anyhow::{bail, Result};
+use clap::Args;
 use firewall::*;
-use libbpf_rs::{Link, Map};
+use libbpf_rs::{Link, Map, MapFlags};
 use std::net::Ipv4Addr;
 use std::path::Path;
+
+#[derive(Args, Debug)]
+#[group(required = true, multiple = false)]
+pub struct Direction {
+    /// Disallow container to visit an external IP
+    #[clap(long, value_name = "IP")]
+    to: Option<String>,
+
+    /// Prevent remote IP from visiting container
+    #[clap(long, value_name = "IP")]
+    from: Option<String>,
+}
 
 pub fn increase_rlimit() -> Result<()> {
     let rl = libc::rlimit {
@@ -31,7 +44,7 @@ pub fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
     let ctn_dir_path = Path::new(&ctn_dir);
     if ctn_dir_path.is_dir() {
         // return if the dir is already there
-        println!("[DEBUG] Dir {:?} already exists.", ctn_dir_path);
+        //println!("[DEBUG] Dir {:?} already exists.", ctn_dir_path);
         return Ok(());
     }
 
@@ -110,7 +123,7 @@ pub fn free_ctn_resources(ctn_name: &str) -> Result<()> {
     let ctn_dir_path = Path::new(&ctn_dir);
     if !ctn_dir_path.try_exists()? {
         // return if the dir is already there
-        println!("[DEBUG] Dir {:?} already deleted.", ctn_dir_path);
+        //println!("[DEBUG] Dir {:?} already deleted.", ctn_dir_path);
         return Ok(());
     }
 
@@ -147,13 +160,17 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
     let ctn_dir_path = Path::new(&ctn_dir);
     if !ctn_dir_path.try_exists()? {
         // return if the dir doesn't exist
-        println!("[DEBUG] No rules applied.");
+        println!("No rules applied to {}.", ctn_name);
         return Ok(());
     }
 
     let all_maps = get_all_maps();
     for m in all_maps {
-        println!("[DEBUG] Rules in {}", m);
+        match m {
+            EGRESS_MAP_NAME => println!("Egress (to) firewall rules: "),
+            INGRESS_MAP_NAME => println!("Ingress (from) firewall rules: "),
+            _ => unreachable!(),
+        };
         let path = format!("{}/{}", ctn_dir, m);
         let map = Map::from_pinned_path(&path)?;
 
@@ -162,8 +179,9 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
             //let value = map.lookup(&key, MapFlags::ANY)?;
             //println!("  {:?}", value.unwrap())
 
-            println!("  {:?}", u32_to_ipv4(key)?)
+            println!("  - {}", u32_to_ipv4(key)?)
         }
+        println!("");
     }
     Ok(())
 }
@@ -192,10 +210,41 @@ pub fn get_ctn_id_from_name(ctn_name: &str) -> Result<String> {
                 }
 
                 let ctn_id = ctns[0].id.clone().unwrap();
-                println!("[DEBUG] Found container {}'s ID: {}", ctn_name, ctn_id);
                 Ok(ctn_id)
             }
             Err(e) => bail!("Error retrieving container {}'s ID: {}", ctn_name, e),
         }
     })
+}
+
+pub fn apply_rule_to(ctn_name: &str, direction: &Direction) -> Result<()> {
+    // Create a folder and store the pinned maps for the container if not exist yet
+    let id = get_ctn_id_from_name(&ctn_name)?;
+    prepare_ctn_dir(&id)?;
+
+    match (&direction.to, &direction.from) {
+        (Some(eg), None) => {
+            // Open the pinned map for egress rules inside the container's folder
+            let eg_fw_map =
+                Map::from_pinned_path(format!("{}/{}/{}", BPF_PATH, &id, EGRESS_MAP_NAME))?;
+
+            // Apply the firewall rule
+            let key = ipv4_to_u32(&eg)?;
+            let value = u8::from(true).to_ne_bytes();
+            eg_fw_map.update(&key, &value, MapFlags::ANY)?;
+        }
+        (None, Some(ing)) => {
+            // Open the pinned map for ingress rules inside the container's folder
+            let ig_fw_map =
+                Map::from_pinned_path(format!("{}/{}/{}", BPF_PATH, &id, INGRESS_MAP_NAME))?;
+
+            // Apply the firewall rule
+            let key = ipv4_to_u32(&ing)?;
+            let value = u8::from(true).to_ne_bytes();
+            ig_fw_map.update(&key, &value, MapFlags::ANY)?;
+        }
+        _ => unreachable!(),
+    };
+
+    Ok(())
 }
