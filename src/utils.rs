@@ -217,31 +217,49 @@ pub fn get_ctn_id_from_name(ctn_name: &str) -> Result<String> {
     })
 }
 
-pub fn apply_rule_to(ctn_name: &str, direction: &Direction) -> Result<()> {
+pub fn update_rule(ctn_name: &str, direction: &Direction, is_block: bool) -> Result<()> {
     // Create a folder and store the pinned maps for the container if not exist yet
-    let id = get_ctn_id_from_name(&ctn_name)?;
-    prepare_ctn_dir(&id)?;
+    let ctn_id = get_ctn_id_from_name(&ctn_name)?;
+
+    if is_block {
+        prepare_ctn_dir(&ctn_id)?;
+    }
+
+    let ctn_dir = get_ctn_bpf_path(&ctn_id);
+    let ctn_dir_path = Path::new(&ctn_dir);
+
+    if !is_block && !ctn_dir_path.try_exists()? {
+        // return if the dir doesn't exist
+        println!("No rules applied to {}.", ctn_name);
+        return Ok(());
+    }
 
     match (&direction.to, &direction.from) {
         (Some(eg), None) => {
             // Open the pinned map for egress rules inside the container's folder
-            let eg_fw_map =
-                Map::from_pinned_path(format!("{}/{}/{}", BPF_PATH, &id, EGRESS_MAP_NAME))?;
+            let eg_fw_map = Map::from_pinned_path(format!("{}/{}", ctn_dir, EGRESS_MAP_NAME))?;
 
             // Apply the firewall rule
             let key = ipv4_to_u32(&eg)?;
-            let value = u8::from(true).to_ne_bytes();
-            eg_fw_map.update(&key, &value, MapFlags::ANY)?;
+            if is_block {
+                let value = u8::from(true).to_ne_bytes();
+                eg_fw_map.update(&key, &value, MapFlags::ANY)?;
+            } else {
+                eg_fw_map.lookup_and_delete(&key)?;
+            }
         }
         (None, Some(ing)) => {
             // Open the pinned map for ingress rules inside the container's folder
-            let ig_fw_map =
-                Map::from_pinned_path(format!("{}/{}/{}", BPF_PATH, &id, INGRESS_MAP_NAME))?;
+            let ig_fw_map = Map::from_pinned_path(format!("{}/{}", ctn_dir, INGRESS_MAP_NAME))?;
 
             // Apply the firewall rule
             let key = ipv4_to_u32(&ing)?;
-            let value = u8::from(true).to_ne_bytes();
-            ig_fw_map.update(&key, &value, MapFlags::ANY)?;
+            if is_block {
+                let value = u8::from(true).to_ne_bytes();
+                ig_fw_map.update(&key, &value, MapFlags::ANY)?;
+            } else {
+                ig_fw_map.lookup_and_delete(&key)?;
+            }
         }
         _ => unreachable!(),
     };

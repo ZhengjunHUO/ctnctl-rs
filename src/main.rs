@@ -20,6 +20,10 @@ enum Commands {
         #[command(flatten)]
         direction: utils::Direction,
     },
+    Unblock {
+        #[command(flatten)]
+        direction: utils::Direction,
+    },
     /// Print firewall rules applied to container
     Show,
     /// Remove container's all firewall rules
@@ -46,7 +50,10 @@ fn main() -> Result<()> {
 
     match &cli.subcommand {
         Commands::Block { direction } => {
-            utils::apply_rule_to(&ctn_name, &direction)?;
+            utils::update_rule(&ctn_name, &direction, true)?;
+        }
+        Commands::Unblock { direction } => {
+            utils::update_rule(&ctn_name, &direction, false)?;
         }
         Commands::Show => {
             utils::show_rules(&ctn_name)?;
