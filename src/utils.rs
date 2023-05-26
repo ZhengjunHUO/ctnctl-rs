@@ -2,7 +2,7 @@ mod firewall {
     include!(concat!(env!("OUT_DIR"), "/cgroup_fw.skel.rs"));
 }
 
-use super::{BPF_PATH, EGRESS_LINK_NAME, EGRESS_MAP_NAME, INGRESS_LINK_NAME, INGRESS_MAP_NAME};
+use super::*;
 use anyhow::{bail, Result};
 use clap::Args;
 use firewall::*;
@@ -88,6 +88,9 @@ pub fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
     let ig_fw_map = maps.ingress_blacklist();
     ig_fw_map.pin(format!("{}/{}", &ctn_dir, INGRESS_MAP_NAME))?;
 
+    let data_flow_map = maps.data_flow();
+    data_flow_map.pin(format!("{}/{}", &ctn_dir, DATAFLOW_MAP_NAME))?;
+
     Ok(())
 }
 
@@ -108,6 +111,12 @@ pub fn u32_to_ipv4(v: Vec<u8>) -> Result<String> {
 }
 
 fn get_all_maps() -> Vec<&'static str> {
+    let mut v = get_rule_maps();
+    v.push(DATAFLOW_MAP_NAME);
+    v
+}
+
+fn get_rule_maps() -> Vec<&'static str> {
     vec![EGRESS_MAP_NAME, INGRESS_MAP_NAME]
 }
 
@@ -164,7 +173,7 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
         return Ok(());
     }
 
-    let all_maps = get_all_maps();
+    let all_maps = get_rule_maps();
     for m in all_maps {
         match m {
             EGRESS_MAP_NAME => println!("Egress (to) firewall rules: "),
@@ -263,6 +272,17 @@ pub fn update_rule(ctn_name: &str, direction: &Direction, is_block: bool) -> Res
         }
         _ => unreachable!(),
     };
+
+    Ok(())
+}
+
+pub fn follow(ctn_name: &str) -> Result<()> {
+    let ctn_id = get_ctn_id_from_name(&ctn_name)?;
+    prepare_ctn_dir(&ctn_id)?;
+
+    let ctn_dir = get_ctn_bpf_path(&ctn_id);
+    let _data_flow_map = Map::from_pinned_path(format!("{}/{}", ctn_dir, DATAFLOW_MAP_NAME))?;
+    println!("Tracking ... press Ctrl + c to quit");
 
     Ok(())
 }

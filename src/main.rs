@@ -29,6 +29,8 @@ enum Commands {
     Show,
     /// Remove container's all firewall rules
     Clear,
+    /// Track container's network package flow
+    Follow,
 }
 
 fn main() -> Result<()> {
@@ -61,6 +63,9 @@ fn main() -> Result<()> {
         }
         Commands::Clear => {
             utils::free_ctn_resources(&ctn_name)?;
+        }
+        Commands::Follow => {
+            utils::follow(&ctn_name)?;
         }
     }
     Ok(())
