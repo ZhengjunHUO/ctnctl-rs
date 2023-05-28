@@ -1,7 +1,11 @@
 [package]
 name = "ctnctl-rs"
+description = "A CLI to apply firewall rules to docker container based on eBPF cgroups"
+repository = "https://github.com/ZhengjunHUO/ctnctl-rs"
 version = "0.1.0"
 edition = "2021"
+license = "GPL-3.0"
+exclude = ["docs/"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
