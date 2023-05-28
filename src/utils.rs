@@ -5,10 +5,13 @@ mod firewall {
 use super::*;
 use anyhow::{bail, Result};
 use clap::Args;
+use crossbeam_channel::{bounded, select, tick, Receiver};
+use ctrlc;
 use firewall::*;
 use libbpf_rs::{Link, Map, MapFlags};
 use std::net::Ipv4Addr;
 use std::path::Path;
+use std::time::Duration;
 
 #[derive(Args, Debug)]
 #[group(required = true, multiple = false)]
@@ -188,10 +191,28 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
             //let value = map.lookup(&key, MapFlags::ANY)?;
             //println!("  {:?}", value.unwrap())
 
-            println!("  - {}", u32_to_ipv4(key)?)
+            println!("  - {}", u32_to_ipv4(key)?);
         }
         println!("");
     }
+
+    /*
+    println!("[DEBUG] DATAFLOW_MAP_NAME");
+    let path = format!("{}/{}", ctn_dir, DATAFLOW_MAP_NAME);
+    let map = Map::from_pinned_path(&path)?;
+
+    for key in map.keys() {
+        println!("[DEBUG] found a key");
+        let value = map.lookup(&key, MapFlags::ANY)?;
+        println!("  {:?}", value.unwrap());
+    }
+
+    let ptr = map.as_libbpf_bpf_map_ptr();
+    match ptr {
+        Some(bpfmap) => println!("[DEBUG] Underlying map: {:?}", bpfmap),
+        None => println!("[DEBUG] Underlying map not found !"),
+    }
+    */
     Ok(())
 }
 
@@ -281,8 +302,54 @@ pub fn follow(ctn_name: &str) -> Result<()> {
     prepare_ctn_dir(&ctn_id)?;
 
     let ctn_dir = get_ctn_bpf_path(&ctn_id);
-    let _data_flow_map = Map::from_pinned_path(format!("{}/{}", ctn_dir, DATAFLOW_MAP_NAME))?;
+    let data_flow_map = Map::from_pinned_path(format!("{}/{}", ctn_dir, DATAFLOW_MAP_NAME))?;
+    let key: [u8; 0] = [];
+
+    // receive a signal periodically
+    let ticker = tick(Duration::from_millis(1000));
+    // receive a signal when pressing ctrl + c
+    let cancel = ctrlc_chan().unwrap();
     println!("Tracking ... press Ctrl + c to quit");
 
+    loop {
+        select! {
+            recv(ticker) -> _ => {
+                loop {
+                    match data_flow_map.lookup_and_delete(&key) {
+                        Ok(rslt) => {
+                            match rslt {
+                                Some(vec) => {
+                                    println!("[DEBUG] dump: {:?}", vec);
+                                }
+                                None => {
+                                    println!("[DEBUG] Empty value, should not happened !");
+                                    break;
+                                }
+                            }
+                        }
+                        Err(_e) => {
+                            //println!("[DEBUG] got an err: {:?}", e);
+                            break;
+                        }
+                    }
+                }
+            }
+            recv(cancel) -> _ => {
+                println!("Ctrl-C signal caught, quit !");
+                break;
+            }
+        }
+    }
+
     Ok(())
+}
+
+fn ctrlc_chan() -> Result<Receiver<()>> {
+    // Creates a channel of bounded capacity
+    let (sender, receiver) = bounded(10);
+    ctrlc::set_handler(move || {
+        let _ = sender.send(());
+    })?;
+
+    Ok(receiver)
 }
