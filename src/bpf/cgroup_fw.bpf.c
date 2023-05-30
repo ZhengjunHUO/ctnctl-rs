@@ -4,7 +4,7 @@
 #include <netinet/udp.h>
 #include <netinet/in.h>
 #include <stdbool.h>
-#include "bpf_helpers.h"
+#include <bpf/bpf_helpers.h>
 
 /* store network packet's info */
 typedef struct {
