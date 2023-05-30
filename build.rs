@@ -1,15 +1,23 @@
-use libbpf_cargo::SkeletonBuilder;
-use std::env;
-use std::path::PathBuf;
-
-const CPROG: &str = "src/bpf/cgroup_fw.bpf.c";
-
 fn main() {
-    let mut out = PathBuf::from(env::var_os("OUT_DIR").expect("Can't infer OUT_DIR in build.rs"));
-    out.push("cgroup_fw.skel.rs");
+    build_and_generate();
+}
+
+#[cfg(feature = "libbpf-cargo")]
+fn build_and_generate() {
+    use libbpf_cargo::SkeletonBuilder;
+    use std::env;
+    use std::path::PathBuf;
+
+    let c_prog = "src/bpf/cgroup_fw.bpf.c";
+    let src_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
+    let out = src_dir.join("src/cgroup_fw.skel.rs");
+
     SkeletonBuilder::new()
-        .source(CPROG)
+        .source(c_prog)
         .build_and_generate(&out)
         .unwrap();
-    println!("cargo:rerun-if-changed={CPROG}");
+    println!("cargo:rerun-if-changed={c_prog}");
 }
+
+#[cfg(not(feature = "libbpf-cargo"))]
+fn build_and_generate() {}

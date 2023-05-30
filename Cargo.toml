@@ -20,4 +20,4 @@ libc = "0.2.142"
 tokio = "1.28.1"
 
 [build-dependencies]
-libbpf-cargo = "0.20.1"
+libbpf-cargo = { version = "0.20.1", optional = true }

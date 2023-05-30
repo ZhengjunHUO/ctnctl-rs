@@ -9,7 +9,7 @@ $ sudo apt install build-essential clang pkgconf zlib1g-dev libelf-dev libbpfcc 
 ```
 ## Build
 ```
-$ cargo build
+$ cargo build [--features "libbpf-cargo"]
 ```
 
 ## Run

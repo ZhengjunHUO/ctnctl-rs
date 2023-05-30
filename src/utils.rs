@@ -1,5 +1,5 @@
 mod firewall {
-    include!(concat!(env!("OUT_DIR"), "/cgroup_fw.skel.rs"));
+    include!("cgroup_fw.skel.rs");
 }
 
 use super::*;
