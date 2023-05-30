@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
-use ctnctl_rs::utils;
+use ctnctl_rs::actions;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -18,12 +18,12 @@ enum Commands {
     /// Add IP to container's blacklist
     Block {
         #[command(flatten)]
-        direction: utils::Direction,
+        direction: actions::Direction,
     },
     /// Remove IP from container's blacklist
     Unblock {
         #[command(flatten)]
-        direction: utils::Direction,
+        direction: actions::Direction,
     },
     /// Print firewall rules applied to container
     Show,
@@ -53,19 +53,19 @@ fn main() -> Result<()> {
 
     match &cli.subcommand {
         Commands::Block { direction } => {
-            utils::update_rule(&ctn_name, &direction, true)?;
+            actions::update_rule(&ctn_name, &direction, true)?;
         }
         Commands::Unblock { direction } => {
-            utils::update_rule(&ctn_name, &direction, false)?;
+            actions::update_rule(&ctn_name, &direction, false)?;
         }
         Commands::Show => {
-            utils::show_rules(&ctn_name)?;
+            actions::show_rules(&ctn_name)?;
         }
         Commands::Clear => {
-            utils::free_ctn_resources(&ctn_name)?;
+            actions::free_ctn_resources(&ctn_name)?;
         }
         Commands::Follow => {
-            utils::follow(&ctn_name)?;
+            actions::follow(&ctn_name)?;
         }
     }
     Ok(())

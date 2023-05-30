@@ -1,4 +1,6 @@
-pub mod utils;
+pub mod actions;
+mod sys;
+mod utils;
 
 const BPF_PATH: &str = "/sys/fs/bpf";
 const EGRESS_MAP_NAME: &str = "cgroup_egs_map";
