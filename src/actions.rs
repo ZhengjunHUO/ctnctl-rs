@@ -54,35 +54,31 @@ pub fn update_rule(
         return Ok(());
     }
 
+    let fw_map;
+    let ip;
+
     match (&direction.to, &direction.from) {
         (Some(eg), None) => {
             // Open the pinned map for egress rules inside the container's folder
-            let eg_fw_map = Map::from_pinned_path(format!("{}/{}", ctn_dir, EGRESS_MAP_NAME))?;
-
-            // Apply the firewall rule
-            let key = ipv4_to_u32(&eg)?;
-            if is_block {
-                let value = u8::from(true).to_ne_bytes();
-                eg_fw_map.update(&key, &value, MapFlags::ANY)?;
-            } else {
-                eg_fw_map.lookup_and_delete(&key)?;
-            }
+            fw_map = Map::from_pinned_path(format!("{}/{}", ctn_dir, EGRESS_MAP_NAME))?;
+            ip = eg;
         }
         (None, Some(ing)) => {
             // Open the pinned map for ingress rules inside the container's folder
-            let ig_fw_map = Map::from_pinned_path(format!("{}/{}", ctn_dir, INGRESS_MAP_NAME))?;
-
-            // Apply the firewall rule
-            let key = ipv4_to_u32(&ing)?;
-            if is_block {
-                let value = u8::from(true).to_ne_bytes();
-                ig_fw_map.update(&key, &value, MapFlags::ANY)?;
-            } else {
-                ig_fw_map.lookup_and_delete(&key)?;
-            }
+            fw_map = Map::from_pinned_path(format!("{}/{}", ctn_dir, INGRESS_MAP_NAME))?;
+            ip = ing;
         }
         _ => unreachable!(),
     };
+
+    // Apply the firewall rule
+    let key = ipv4_to_u32(&ip)?;
+    if is_block {
+        let value = u8::from(true).to_ne_bytes();
+        fw_map.update(&key, &value, MapFlags::ANY)?;
+    } else {
+        fw_map.lookup_and_delete(&key)?;
+    }
 
     Ok(())
 }
