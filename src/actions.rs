@@ -20,7 +20,24 @@ pub struct Direction {
     from: Option<String>,
 }
 
-pub fn update_rule(ctn_name: &str, direction: &Direction, is_block: bool) -> Result<()> {
+#[derive(Args, Debug)]
+#[group(required = false, multiple = false)]
+pub struct Protocol {
+    /// specify a tcp port
+    #[clap(long, value_name = "TCP_PORT")]
+    tcp: Option<String>,
+
+    /// specify a udp port
+    #[clap(long, value_name = "UDP_PORT")]
+    udp: Option<String>,
+}
+
+pub fn update_rule(
+    ctn_name: &str,
+    direction: &Direction,
+    _protocol: &Protocol,
+    is_block: bool,
+) -> Result<()> {
     // Create a folder and store the pinned maps for the container if not exist yet
     let ctn_id = get_ctn_id_from_name(&ctn_name)?;
 

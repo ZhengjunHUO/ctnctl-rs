@@ -59,8 +59,14 @@ pub fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
     // Persist the map on bpf vfs
     eg_fw_map.pin(format!("{}/{}", &ctn_dir, EGRESS_MAP_NAME))?;
 
+    let eg_l4_fw_map = maps.egress_l4_blacklist();
+    eg_l4_fw_map.pin(format!("{}/{}", &ctn_dir, EGRESS_L4_MAP_NAME))?;
+
     let ig_fw_map = maps.ingress_blacklist();
     ig_fw_map.pin(format!("{}/{}", &ctn_dir, INGRESS_MAP_NAME))?;
+
+    let ig_l4_fw_map = maps.ingress_l4_blacklist();
+    ig_l4_fw_map.pin(format!("{}/{}", &ctn_dir, INGRESS_L4_MAP_NAME))?;
 
     let data_flow_map = maps.data_flow();
     data_flow_map.pin(format!("{}/{}", &ctn_dir, DATAFLOW_MAP_NAME))?;
@@ -91,7 +97,12 @@ pub fn get_all_maps() -> Vec<&'static str> {
 }
 
 pub fn get_rule_maps() -> Vec<&'static str> {
-    vec![EGRESS_MAP_NAME, INGRESS_MAP_NAME]
+    vec![
+        EGRESS_MAP_NAME,
+        INGRESS_MAP_NAME,
+        EGRESS_L4_MAP_NAME,
+        INGRESS_L4_MAP_NAME,
+    ]
 }
 
 pub fn get_ctn_bpf_path(ctn_id: &str) -> String {

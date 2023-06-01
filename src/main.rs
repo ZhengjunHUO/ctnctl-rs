@@ -19,11 +19,15 @@ enum Commands {
     Block {
         #[command(flatten)]
         direction: actions::Direction,
+        #[command(flatten)]
+        protocol: actions::Protocol,
     },
     /// Remove IP from container's blacklist
     Unblock {
         #[command(flatten)]
         direction: actions::Direction,
+        #[command(flatten)]
+        protocol: actions::Protocol,
     },
     /// Print firewall rules applied to container
     Show,
@@ -52,11 +56,17 @@ fn main() -> Result<()> {
     }
 
     match &cli.subcommand {
-        Commands::Block { direction } => {
-            actions::update_rule(&ctn_name, &direction, true)?;
+        Commands::Block {
+            direction,
+            protocol,
+        } => {
+            actions::update_rule(&ctn_name, &direction, &protocol, true)?;
         }
-        Commands::Unblock { direction } => {
-            actions::update_rule(&ctn_name, &direction, false)?;
+        Commands::Unblock {
+            direction,
+            protocol,
+        } => {
+            actions::update_rule(&ctn_name, &direction, &protocol, false)?;
         }
         Commands::Show => {
             actions::show_rules(&ctn_name)?;
