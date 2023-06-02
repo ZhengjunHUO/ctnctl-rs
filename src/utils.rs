@@ -101,6 +101,16 @@ pub fn u32_to_ipv4(v: Vec<u8>) -> Result<String> {
     Ok(ip.to_string())
 }
 
+pub fn u64_to_socket(v: Vec<u8>) -> Result<String> {
+    if v.len() != 8 {
+        bail!("Unexpected key stored in the map: {:?}", v)
+    }
+
+    let ip = Ipv4Addr::from([v[0], v[1], v[2], v[3]]).to_string();
+    let skt = format!("{}:{}", ip, u16::from_be_bytes([v[4], v[5]]));
+    Ok(skt)
+}
+
 pub fn get_all_maps() -> Vec<&'static str> {
     let mut v = get_rule_maps();
     v.push(DATAFLOW_MAP_NAME);

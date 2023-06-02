@@ -207,24 +207,39 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
     }
 
     let all_maps = get_rule_maps();
+    let mut is_l3;
     for m in all_maps {
         match m {
-            EGRESS_MAP_NAME => println!("L3 Egress (to) firewall rules: "),
-            INGRESS_MAP_NAME => println!("L3 Ingress (from) firewall rules: "),
-            EGRESS_L4_MAP_NAME => println!("L4 Egress (to) firewall rules: "),
-            INGRESS_L4_MAP_NAME => println!("L4 Ingress (from) firewall rules: "),
+            EGRESS_MAP_NAME => {
+                println!("L3 Egress (to) firewall rules: ");
+                is_l3 = true;
+            }
+            INGRESS_MAP_NAME => {
+                println!("L3 Ingress (from) firewall rules: ");
+                is_l3 = true;
+            }
+            EGRESS_L4_MAP_NAME => {
+                println!("L4 Egress (to) firewall rules: ");
+                is_l3 = false;
+            }
+            INGRESS_L4_MAP_NAME => {
+                println!("L4 Ingress (from) firewall rules: ");
+                is_l3 = false;
+            }
             _ => unreachable!(),
         };
         let path = format!("{}/{}", ctn_dir, m);
         let map = Map::from_pinned_path(&path)?;
 
-        // TODO: adapte to L4
         for key in map.keys() {
             // print the key, the value is always 1 (true) here
             //let value = map.lookup(&key, MapFlags::ANY)?;
             //println!("  {:?}", value.unwrap())
-
-            println!("  - {}", u32_to_ipv4(key)?);
+            if is_l3 {
+                println!("  - {}", u32_to_ipv4(key)?);
+            } else {
+                println!("  - {}", u64_to_socket(key)?);
+            }
         }
         println!("");
     }
