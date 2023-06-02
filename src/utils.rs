@@ -81,6 +81,17 @@ pub fn ipv4_to_u32(ip: &str) -> Result<[u8; 4]> {
     Ok(u32::from(ip_parsed).to_be_bytes())
 }
 
+pub fn skt_to_u64(ip: &str, port: u16, _is_udp: bool) -> Result<[u8; 8]> {
+    let ip_parsed = ipv4_to_u32(ip)?;
+    let port_parsed: [u8; 2] = port.to_be_bytes();
+    // TODO leverage is_udp
+
+    let mut rslt: [u8; 8] = [0; 8];
+    rslt[..4].copy_from_slice(&ip_parsed);
+    rslt[4..6].copy_from_slice(&port_parsed);
+    Ok(rslt)
+}
+
 pub fn u32_to_ipv4(v: Vec<u8>) -> Result<String> {
     if v.len() != 4 {
         bail!("Unexpected key stored in the map: {:?}", v)

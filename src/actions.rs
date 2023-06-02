@@ -24,18 +24,115 @@ pub struct Direction {
 #[group(required = false, multiple = false)]
 pub struct Protocol {
     /// specify a tcp port
-    #[clap(long, value_name = "TCP_PORT")]
-    tcp: Option<String>,
+    #[arg(long, value_name = "TCP_PORT", value_parser = clap::value_parser!(u16).range(1001..))]
+    tcp: Option<u16>,
 
     /// specify a udp port
-    #[clap(long, value_name = "UDP_PORT")]
-    udp: Option<String>,
+    #[arg(long, value_name = "UDP_PORT", value_parser = clap::value_parser!(u16).range(1001..))]
+    udp: Option<u16>,
+}
+
+struct Rule {
+    ip: String,
+    ctn_dir: String,
+    port: u16,
+    is_l4: bool,
+    is_udp: bool,
+    is_ingress: bool,
+}
+
+impl<'a> Rule {
+    fn map(&self) -> Result<Map> {
+        match (self.is_l4, self.is_ingress) {
+            (true, true) => {
+                return Ok(Map::from_pinned_path(format!(
+                    "{}/{}",
+                    self.ctn_dir, INGRESS_L4_MAP_NAME
+                ))?)
+            }
+            (true, false) => {
+                return Ok(Map::from_pinned_path(format!(
+                    "{}/{}",
+                    self.ctn_dir, EGRESS_L4_MAP_NAME
+                ))?)
+            }
+            // Open the pinned map for ingress rules inside the container's folder
+            (false, true) => {
+                return Ok(Map::from_pinned_path(format!(
+                    "{}/{}",
+                    self.ctn_dir, INGRESS_MAP_NAME
+                ))?)
+            }
+            // Open the pinned map for egress rules inside the container's folder
+            (false, false) => {
+                return Ok(Map::from_pinned_path(format!(
+                    "{}/{}",
+                    self.ctn_dir, EGRESS_MAP_NAME
+                ))?)
+            }
+        }
+    }
+
+    fn key(&self) -> Result<Vec<u8>> {
+        match self.is_l4 {
+            true => {
+                let k = skt_to_u64(&self.ip, self.port, self.is_udp)?;
+                return Ok(Vec::from(k));
+            }
+            false => {
+                let k = ipv4_to_u32(&self.ip)?;
+                return Ok(Vec::from(k));
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+struct RuleBuilder {
+    ip: Option<String>,
+    ctn_dir: Option<String>,
+    port: Option<u16>,
+    is_l4: bool,
+    is_udp: bool,
+    is_ingress: bool,
+}
+
+impl RuleBuilder {
+    fn new() -> RuleBuilder {
+        Default::default()
+    }
+
+    fn port(mut self, p: u16) -> RuleBuilder {
+        self.port = Some(p);
+        self
+    }
+
+    fn ip(mut self, addr: &str) -> RuleBuilder {
+        self.ip = Some(addr.to_string());
+        self
+    }
+
+    fn ctn_dir(mut self, dir: &str) -> RuleBuilder {
+        self.ctn_dir = Some(dir.to_string());
+        self
+    }
+
+    fn build(self) -> Rule {
+        Rule {
+            ip: self.ip.unwrap(),
+            ctn_dir: self.ctn_dir.unwrap(),
+            port: self.port.unwrap_or(0),
+            is_l4: self.is_l4,
+            is_udp: self.is_udp,
+            is_ingress: self.is_ingress,
+        }
+    }
 }
 
 pub fn update_rule(
     ctn_name: &str,
     direction: &Direction,
-    _protocol: &Protocol,
+    protocol: &Protocol,
     is_block: bool,
 ) -> Result<()> {
     // Create a folder and store the pinned maps for the container if not exist yet
@@ -54,25 +151,38 @@ pub fn update_rule(
         return Ok(());
     }
 
-    let fw_map;
-    let ip;
+    let mut builder = RuleBuilder::new();
+    builder = builder.ctn_dir(&ctn_dir);
+
+    match (protocol.tcp, protocol.udp) {
+        (Some(p), None) => {
+            builder.is_l4 = true;
+            builder = builder.port(p);
+        }
+        (None, Some(p)) => {
+            builder.is_l4 = true;
+            builder.is_udp = true;
+            builder = builder.port(p);
+        }
+        _ => (),
+    }
 
     match (&direction.to, &direction.from) {
         (Some(eg), None) => {
-            // Open the pinned map for egress rules inside the container's folder
-            fw_map = Map::from_pinned_path(format!("{}/{}", ctn_dir, EGRESS_MAP_NAME))?;
-            ip = eg;
+            builder = builder.ip(&eg);
         }
         (None, Some(ing)) => {
-            // Open the pinned map for ingress rules inside the container's folder
-            fw_map = Map::from_pinned_path(format!("{}/{}", ctn_dir, INGRESS_MAP_NAME))?;
-            ip = ing;
+            builder.is_ingress = true;
+            builder = builder.ip(&ing);
         }
         _ => unreachable!(),
     };
 
+    let rule = builder.build();
+    let fw_map = rule.map()?;
+    let key = rule.key()?;
+
     // Apply the firewall rule
-    let key = ipv4_to_u32(&ip)?;
     if is_block {
         let value = u8::from(true).to_ne_bytes();
         fw_map.update(&key, &value, MapFlags::ANY)?;
@@ -99,13 +209,16 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
     let all_maps = get_rule_maps();
     for m in all_maps {
         match m {
-            EGRESS_MAP_NAME => println!("Egress (to) firewall rules: "),
-            INGRESS_MAP_NAME => println!("Ingress (from) firewall rules: "),
+            EGRESS_MAP_NAME => println!("L3 Egress (to) firewall rules: "),
+            INGRESS_MAP_NAME => println!("L3 Ingress (from) firewall rules: "),
+            EGRESS_L4_MAP_NAME => println!("L4 Egress (to) firewall rules: "),
+            INGRESS_L4_MAP_NAME => println!("L4 Ingress (from) firewall rules: "),
             _ => unreachable!(),
         };
         let path = format!("{}/{}", ctn_dir, m);
         let map = Map::from_pinned_path(&path)?;
 
+        // TODO: adapte to L4
         for key in map.keys() {
             // print the key, the value is always 1 (true) here
             //let value = map.lookup(&key, MapFlags::ANY)?;
