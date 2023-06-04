@@ -84,13 +84,12 @@ pub fn ipv4_to_u32(ip: &str) -> Result<[u8; 4]> {
 pub fn skt_to_u64(ip: &str, port: u16, is_udp: bool) -> Result<[u8; 8]> {
     let ip_parsed = ipv4_to_u32(ip)?;
     let port_parsed: [u8; 2] = port.to_be_bytes();
-    let proto: u16 = if is_udp { 1 } else { 0 };
-    let proto_parsed: [u8; 2] = proto.to_be_bytes();
+    let proto: u8 = if is_udp { UDP_PROTO } else { TCP_PROTO };
 
     let mut rslt: [u8; 8] = [0; 8];
     rslt[..4].copy_from_slice(&ip_parsed);
     rslt[4..6].copy_from_slice(&port_parsed);
-    rslt[6..8].copy_from_slice(&proto_parsed);
+    rslt[6] = proto;
     Ok(rslt)
 }
 
@@ -109,10 +108,10 @@ pub fn u64_to_socket(v: Vec<u8>) -> Result<String> {
     }
 
     let ip = Ipv4Addr::from([v[0], v[1], v[2], v[3]]).to_string();
-    let proto = if u16::from_be_bytes([v[6], v[7]]) == 0 {
-        "TCP"
-    } else {
-        "UDP"
+    let proto = match v[6] {
+        TCP_PROTO => "TCP",
+        UDP_PROTO => "UDP",
+        _ => "UNKNOWN",
     };
     let skt = format!("{}:{} ({})", ip, u16::from_be_bytes([v[4], v[5]]), proto);
     Ok(skt)

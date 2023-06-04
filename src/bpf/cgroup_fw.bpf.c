@@ -20,7 +20,8 @@ typedef struct {
 typedef struct {
     __u32 addr;
     __u16 port;
-    __u16 reserved;
+    __u8  proto;
+    __u8  reserved;
 } skt;
 
 /* store L3 blacklist rules for ingress */
@@ -85,6 +86,7 @@ static inline int filter_packet(struct __sk_buff *skb, bool isIngress) {
     p.saddr = iphd->saddr;
     p.daddr = iphd->daddr;
     p.proto = iphd->protocol;
+    s.proto = iphd->protocol;
 
     if (iphd->protocol == IPPROTO_TCP) {
         struct tcphdr *tcphd = data + iphdr_len;
