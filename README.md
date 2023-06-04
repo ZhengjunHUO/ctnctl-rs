@@ -35,6 +35,7 @@ Options:
 $ sudo ./target/debug/ctnctl-rs block --to 8.8.4.4 ctn1
 # Blacklist some remote IP to visit target container on some port
 $ sudo ./target/debug/ctnctl-rs block --from 172.17.0.2 --tcp 8000 ctn2
+$ sudo ./target/debug/ctnctl-rs block --from 172.17.0.2 --udp 8088 ctn2
 
 # Show active rules
 $ sudo ./target/debug/ctnctl-rs show ctn1
@@ -56,6 +57,7 @@ L4 Egress (to) firewall rules:
 
 L4 Ingress (from) firewall rules: 
   - 172.17.0.2:8000 (TCP)
+  - 172.17.0.2:8088 (UDP)
 
 # Remove all rules applied to the container
 $ sudo ./target/debug/ctnctl-rs clear ctn1
@@ -63,4 +65,12 @@ $ sudo ./target/debug/ctnctl-rs clear ctn1
 # When container doesn't exist
 $ sudo ./target/debug/ctnctl-rs clear rust
 Error: Container rust not found !
+```
+
+## Test UDP
+```
+# server up
+$ nc -lup 8088
+# contact server
+$ echo -n "hello" | nc -u -w1 172.17.0.3 8088
 ```
