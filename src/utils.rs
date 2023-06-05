@@ -102,7 +102,7 @@ pub fn u32_to_ipv4(v: Vec<u8>) -> Result<String> {
     Ok(ip.to_string())
 }
 
-pub fn u64_to_socket(v: Vec<u8>) -> Result<String> {
+pub fn u64_to_skt(v: Vec<u8>) -> Result<String> {
     if v.len() != 8 {
         bail!("Unexpected key stored in the map: {:?}", v)
     }
@@ -133,15 +133,25 @@ pub fn parse_pkt(pkt: &[u8]) -> Result<String> {
         _ => "UNKNOWN",
     };
     let is_ingress = { (pkt[13] & 1) == 1 };
-    let is_banned_l3 = { ((pkt[13] & 2) >> 1 ) == 1 };
-    let is_banned_l4 = { ((pkt[13] & 4) >> 2 ) == 1 };
+    let is_banned_l3 = { ((pkt[13] & 2) >> 1) == 1 };
+    let is_banned_l4 = { ((pkt[13] & 4) >> 2) == 1 };
 
     let mut result;
     match (is_ingress, proto) {
-        (true, "ICMP") => result = format!("{} IN {} > {}", proto, src_ip, dst_ip),
-        (true, _) => result = format!("{} IN {}:{} > {}:{}", proto, src_ip, src_port, dst_ip, dst_port),
+        (true, "ICMP") => result = format!("{} IN {} < {}", proto, dst_ip, src_ip),
+        (true, _) => {
+            result = format!(
+                "{} IN {}:{} < {}:{}",
+                proto, dst_ip, dst_port, src_ip, src_port
+            )
+        }
         (false, "ICMP") => result = format!("{} OUT {} > {}", proto, src_ip, dst_ip),
-        (false, _) => result = format!("{} OUT {}:{} > {}:{}", proto, src_ip, src_port, dst_ip, dst_port),
+        (false, _) => {
+            result = format!(
+                "{} OUT {}:{} > {}:{}",
+                proto, src_ip, src_port, dst_ip, dst_port
+            )
+        }
     }
 
     if is_banned_l3 {

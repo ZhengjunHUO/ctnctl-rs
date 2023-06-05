@@ -142,7 +142,7 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
             if is_l3 {
                 println!("  - {}", u32_to_ipv4(key)?);
             } else {
-                println!("  - {}", u64_to_socket(key)?);
+                println!("  - {}", u64_to_skt(key)?);
             }
         }
         println!("");
