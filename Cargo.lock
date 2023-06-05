@@ -333,7 +333,7 @@ dependencies = [
  "ctrlc",
  "docker-api",
  "libbpf-cargo",
- "libbpf-rs",
+ "libbpf-rs 0.20.1 (git+https://github.com/ZhengjunHUO/libbpf-rs.git?branch=allow-lookup-inside-queue)",
  "libc",
  "tokio",
 ]
@@ -762,7 +762,7 @@ dependencies = [
  "anyhow",
  "cargo_metadata",
  "clap 3.2.25",
- "libbpf-rs",
+ "libbpf-rs 0.20.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libbpf-sys",
  "memmap2",
  "num_enum",
@@ -781,6 +781,21 @@ name = "libbpf-rs"
 version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c1401b366ec96859ef47e68a26f6b9e7cc2f241fafd8c844eba50033bf548b3"
+dependencies = [
+ "bitflags",
+ "lazy_static",
+ "libbpf-sys",
+ "nix",
+ "num_enum",
+ "strum_macros",
+ "thiserror",
+ "vsprintf",
+]
+
+[[package]]
+name = "libbpf-rs"
+version = "0.20.1"
+source = "git+https://github.com/ZhengjunHUO/libbpf-rs.git?branch=allow-lookup-inside-queue#8f01a906ede1939c9fbae887c85e561566c58fe7"
 dependencies = [
  "bitflags",
  "lazy_static",

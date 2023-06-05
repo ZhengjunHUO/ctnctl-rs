@@ -148,24 +148,6 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
         println!("");
     }
 
-    /*
-    println!("[DEBUG] DATAFLOW_MAP_NAME");
-    let path = format!("{}/{}", ctn_dir, DATAFLOW_MAP_NAME);
-    let map = Map::from_pinned_path(&path)?;
-    println!("[DEBUG] path: {:?}; type: {:?}; fd: {:?}; name: {:?}", path, map.map_type(), map.fd(), map.name());
-
-    for key in map.keys() {
-        println!("[DEBUG] found a key");
-        let value = map.lookup(&key, MapFlags::ANY)?;
-        println!("  {:?}", value.unwrap());
-    }
-
-    let ptr = map.as_libbpf_bpf_map_ptr();
-    match ptr {
-        Some(bpfmap) => println!("[DEBUG] Underlying map: {:?}", bpfmap),
-        None => println!("[DEBUG] Underlying map not found !"),
-    }
-    */
     Ok(())
 }
 
@@ -222,23 +204,12 @@ pub fn follow(ctn_name: &str) -> Result<()> {
     loop {
         select! {
             recv(ticker) -> _ => {
-                loop {
-                    match data_flow_map.lookup_and_delete(&key) {
-                        Ok(rslt) => {
-                            match rslt {
-                                Some(vec) => {
-                                    println!("[DEBUG] dump: {:?}", vec);
-                                }
-                                None => {
-                                    println!("[DEBUG] Empty value, should not happened !");
-                                    break;
-                                }
-                            }
+                while let Ok(value) = data_flow_map.lookup_and_delete(&key) {
+                    match value {
+                        Some(record) => {
+                            println!("  {}", parse_pkt(&record).unwrap());
                         }
-                        Err(_e) => {
-                            //println!("[DEBUG] got an err: {:?}", e);
-                            break;
-                        }
+                        None => break,
                     }
                 }
             }

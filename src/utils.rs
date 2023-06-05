@@ -117,6 +117,44 @@ pub fn u64_to_socket(v: Vec<u8>) -> Result<String> {
     Ok(skt)
 }
 
+pub fn parse_pkt(pkt: &[u8]) -> Result<String> {
+    if pkt.len() != 16 {
+        bail!("Unexpected pkt stored in the map: {:?}", pkt)
+    }
+
+    let src_ip = Ipv4Addr::from([pkt[0], pkt[1], pkt[2], pkt[3]]).to_string();
+    let dst_ip = Ipv4Addr::from([pkt[4], pkt[5], pkt[6], pkt[7]]).to_string();
+    let src_port = u16::from_be_bytes([pkt[8], pkt[9]]);
+    let dst_port = u16::from_be_bytes([pkt[10], pkt[11]]);
+    let proto = match pkt[12] {
+        TCP_PROTO => "TCP",
+        UDP_PROTO => "UDP",
+        ICMP_PROTO => "ICMP",
+        _ => "UNKNOWN",
+    };
+    let is_ingress = { (pkt[13] & 1) == 1 };
+    let is_banned_l3 = { ((pkt[13] & 2) >> 1 ) == 1 };
+    let is_banned_l4 = { ((pkt[13] & 4) >> 2 ) == 1 };
+
+    let mut result;
+    match (is_ingress, proto) {
+        (true, "ICMP") => result = format!("{} IN {} > {}", proto, src_ip, dst_ip),
+        (true, _) => result = format!("{} IN {}:{} > {}:{}", proto, src_ip, src_port, dst_ip, dst_port),
+        (false, "ICMP") => result = format!("{} OUT {} > {}", proto, src_ip, dst_ip),
+        (false, _) => result = format!("{} OUT {}:{} > {}:{}", proto, src_ip, src_port, dst_ip, dst_port),
+    }
+
+    if is_banned_l3 {
+        result.push_str(" (BANNED L3)");
+    }
+
+    if is_banned_l4 {
+        result.push_str(" (BANNED L4)");
+    }
+
+    Ok(result)
+}
+
 pub fn get_all_maps() -> Vec<&'static str> {
     let mut v = get_rule_maps();
     v.push(DATAFLOW_MAP_NAME);
