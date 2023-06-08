@@ -15,9 +15,9 @@ clap = { version = "4.2.7", features = ["derive"] }
 crossbeam-channel = "0.5.8"
 ctrlc = "3.3.1"
 docker-api = "0.12.2"
-libbpf-rs = "0.20.1"
+libbpf-rs = { git = "https://github.com/ZhengjunHUO/libbpf-rs.git", branch = "allow-lookup-inside-queue" }
 libc = "0.2.142"
-tokio = "1.28.1"
+tokio = { version = "1.28.1", features = ["rt"] }
 
 [build-dependencies]
 libbpf-cargo = { version = "0.20.1", optional = true }
