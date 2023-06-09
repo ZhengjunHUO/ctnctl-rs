@@ -1,6 +1,6 @@
 # ctnctl-rs
 A CLI to apply firewall rules to docker container based on eBPF cgroups in Rust. 
-- See the Go version [here](https://github.com/ZhengjunHUO/ctnctl)
+- See the original Go version [here](https://github.com/ZhengjunHUO/ctnctl) based on cilium ebpf lib.
 
 ## Prerequis
 ```sh
@@ -12,52 +12,35 @@ $ sudo apt install build-essential clang pkgconf zlib1g-dev libelf-dev libbpfcc 
 $ cargo build [--features "libbpf-cargo"]
 ```
 
-## Run
+## Usage
+![usage](./docs/01_help.png)
+
+## Apply rule(s) to container
 ```
-# Usage
-$ sudo ./target/debug/ctnctl-rs block -h
-Add IP to container's blacklist
-
-Usage: ctnctl-rs block [OPTIONS] <--to <IP>|--from <IP>> [CONTAINER_NAME]
-
-Arguments:
-  [CONTAINER_NAME]  
-
-Options:
-      --to <IP>         visit an external IP from container
-      --from <IP>       be visited from a remote IP
-      --tcp <TCP_PORT>  specify a tcp port
-      --udp <UDP_PORT>  specify a udp port
-  -h, --help            Print help
-  -V, --version         Print version
-
-# Block container from visiting some IP
-$ sudo ./target/debug/ctnctl-rs block --to 8.8.4.4 ctn1
-# Blacklist some remote IP to visit target container on some port
+# Blacklist some remote connection for tcp/udp port on target container
 $ sudo ./target/debug/ctnctl-rs block --from 172.17.0.2 --tcp 8000 ctn2
 $ sudo ./target/debug/ctnctl-rs block --from 172.17.0.2 --udp 8088 ctn2
+# Block container from visiting some external service
+$ sudo ./target/debug/ctnctl-rs block --to 8.8.4.4 ctn1
+$ sudo ./target/debug/ctnctl-rs block --to 172.17.0.3 --tcp 8088 ctn1
+```
 
-# Show active rules
-$ sudo ./target/debug/ctnctl-rs show ctn1
-L3 Egress (to) firewall rules: 
-  - 8.8.4.4
+## Show container's active rule(s)
+![show](./docs/02_show.png)
 
-L3 Ingress (from) firewall rules: 
+## Monitoring container's ingress/egress traffic
+```
+$ docker exec -ti ctn1 ping -c 1 8.8.8.8
+$ docker exec -ti ctn1 ping -c 1 8.8.4.4
+$ docker exec -ti ctn1 curl -m 3 172.17.0.3:8088
+$ docker exec -ti ctn1 curl 172.17.0.3:8000
+```
+![follow](./docs/03_follow.png)
 
-L4 Egress (to) firewall rules: 
-
-L4 Ingress (from) firewall rules: 
-
-$ sudo ./target/debug/ctnctl-rs show ctn2
-L3 Egress (to) firewall rules: 
-
-L3 Ingress (from) firewall rules: 
-
-L4 Egress (to) firewall rules: 
-
-L4 Ingress (from) firewall rules: 
-  - 172.17.0.2:8000 (TCP)
-  - 172.17.0.2:8088 (UDP)
+## Clean up rule(s)
+```
+# Remove certain rule applied to the container
+$ sudo ./target/debug/ctnctl-rs unblock --to 8.8.4.4 ctn1
 
 # Remove all rules applied to the container
 $ sudo ./target/debug/ctnctl-rs clear ctn1
