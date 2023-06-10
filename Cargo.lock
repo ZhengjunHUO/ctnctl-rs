@@ -203,9 +203,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.3.2"
+version = "4.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "401a4694d2bf92537b6867d94de48c4842089645fdcdf6c71865b175d836e9c2"
+checksum = "ca8f255e4b8027970e78db75e78831229c9815fdbfa67eb1a1b777a62e24b4a0"
 dependencies = [
  "clap_builder",
  "clap_derive 4.3.2",
@@ -214,9 +214,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.3.1"
+version = "4.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72394f3339a76daf211e57d4bcb374410f3965dcc606dd0e03738c7888766980"
+checksum = "acd4f3c17c83b0ba34ffbc4f8bbd74f079413f747f84a6f89292f138057e36ab"
 dependencies = [
  "anstream",
  "anstyle",
@@ -334,7 +334,7 @@ name = "ctnctl-rs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.3.2",
+ "clap 4.3.3",
  "crossbeam-channel",
  "ctrlc",
  "docker-api",
@@ -801,7 +801,7 @@ dependencies = [
 [[package]]
 name = "libbpf-rs"
 version = "0.20.1"
-source = "git+https://github.com/ZhengjunHUO/libbpf-rs.git?branch=allow-lookup-inside-queue#e3d055c9d4f9372339a5b1c437eaa357f9d75313"
+source = "git+https://github.com/ZhengjunHUO/libbpf-rs.git?branch=allow-lookup-inside-queue#efeb0daf186df2272b8a56b23d5a0192b837da44"
 dependencies = [
  "bitflags",
  "lazy_static",
