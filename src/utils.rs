@@ -2,6 +2,7 @@ use super::*;
 use anyhow::{bail, Result};
 use std::net::Ipv4Addr;
 
+/// Convert ipv4 address to a four element byte array
 pub fn ipv4_to_u32(ip: &str) -> Result<[u8; 4]> {
     use std::str::FromStr;
 
@@ -9,6 +10,17 @@ pub fn ipv4_to_u32(ip: &str) -> Result<[u8; 4]> {
     Ok(u32::from(ip_parsed).to_be_bytes())
 }
 
+/// Build a key for the bpf hashmap from ip, port and protocol
+///
+/// The related struct in bpf program:
+/// ```text
+/// typedef struct {
+///     __u32 addr;
+///     __u16 port;
+///     __u8 proto;
+///     __u8 reserved;
+/// } skt;
+/// ```
 pub fn skt_to_u64(ip: &str, port: u16, is_udp: bool) -> Result<[u8; 8]> {
     let ip_parsed = ipv4_to_u32(ip)?;
     let port_parsed: [u8; 2] = port.to_be_bytes();
@@ -21,6 +33,7 @@ pub fn skt_to_u64(ip: &str, port: u16, is_udp: bool) -> Result<[u8; 8]> {
     Ok(rslt)
 }
 
+/// Convert a four element byte array to ipv4 address
 pub fn u32_to_ipv4(v: &[u8]) -> Result<String> {
     if v.len() != 4 {
         bail!("Unexpected key stored in the map: {:?}", v)
@@ -30,6 +43,7 @@ pub fn u32_to_ipv4(v: &[u8]) -> Result<String> {
     Ok(ip.to_string())
 }
 
+/// Parse a byte array to a `<IP>:<PORT> (<TCP>|<UDP>)` String
 pub fn u64_to_skt(v: &[u8]) -> Result<String> {
     if v.len() != 8 {
         bail!("Unexpected key stored in the map: {:?}", v)
@@ -45,6 +59,19 @@ pub fn u64_to_skt(v: &[u8]) -> Result<String> {
     Ok(skt)
 }
 
+/// Parse a byte array to an log entry showing the network packet flow
+///
+/// The related struct in bpf program:
+/// ```text
+/// typedef struct {
+///     __u32 saddr;
+///     __u32 daddr;
+///     __u16 sport;
+///     __u16 dport;
+///     __u8 proto;
+///     __u8 bitmap;
+/// } pkt;
+/// ```
 pub fn parse_pkt(pkt: &[u8]) -> Result<String> {
     if pkt.len() != 16 {
         bail!("Unexpected pkt stored in the map: {:?}", pkt)
@@ -93,12 +120,14 @@ pub fn parse_pkt(pkt: &[u8]) -> Result<String> {
     Ok(result)
 }
 
+/// Return a list of all pinned map
 pub fn get_all_maps() -> Vec<&'static str> {
     let mut v = get_rule_maps();
     v.push(DATAFLOW_MAP_NAME);
     v
 }
 
+/// Return a list of pinned map containing the firewall rules
 pub fn get_rule_maps() -> Vec<&'static str> {
     vec![
         EGRESS_MAP_NAME,
@@ -108,6 +137,7 @@ pub fn get_rule_maps() -> Vec<&'static str> {
     ]
 }
 
+/// Return a path containing all pinned resource related to container
 pub fn get_ctn_bpf_path(ctn_id: &str) -> String {
     format!("{}/{}", BPF_PATH, ctn_id)
 }
@@ -117,7 +147,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ipv4_u32_translation() {
+    fn test_convert_ipv4_u32() {
         let ip = "172.16.0.10";
         let expect: [u8; 4] = [172, 16, 0, 10];
         let rslt = ipv4_to_u32(&ip).expect("Failed to parse ip");
@@ -129,7 +159,7 @@ mod tests {
     }
 
     #[test]
-    fn test_skt_u64_translation() {
+    fn test_convert_skt_u64() {
         let ip = "172.17.0.3";
         // 8088 => 00011111 10011000
         let expect: [u8; 8] = [172, 17, 0, 3, 31, 152, 17, 0];
@@ -140,5 +170,13 @@ mod tests {
         let restored = u64_to_skt(&rslt).expect("Failed to restore back to ip:port");
         let expect_output = "172.17.0.3:8088 (UDP)";
         assert_eq!(restored, expect_output);
+    }
+
+    #[test]
+    fn test_parse_pkt() {
+        let pkt: [u8; 16] = [10, 20, 0, 1, 10, 20, 0, 8, 121, 24, 31, 152, 6, 5, 0, 0];
+        let expect = "TCP IN 10.20.0.8:8088 < 10.20.0.1:31000 (BANNED L4)";
+        let rslt = parse_pkt(&pkt).expect("Failed to parse the packet");
+        assert_eq!(rslt, expect);
     }
 }
