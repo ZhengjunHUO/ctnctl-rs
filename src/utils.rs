@@ -71,6 +71,12 @@ pub fn u64_to_skt(v: &[u8]) -> Result<String> {
 ///     __u8 proto;
 ///     __u8 bitmap;
 /// } pkt;
+///
+/// bitmap:
+///  00000000
+///       |||- isIngress
+///       ||-- isBannedL3
+///       |--- isBannedL4
 /// ```
 pub fn parse_pkt(pkt: &[u8]) -> Result<String> {
     if pkt.len() != 16 {

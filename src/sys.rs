@@ -15,6 +15,7 @@ pub fn increase_rlimit() -> Result<()> {
     Ok(())
 }
 
+/// Retrieve container's ID given its name if the container is running.
 pub fn get_ctn_id_from_name(ctn_name: &str) -> Result<String> {
     use docker_api::opts::{ContainerFilter, ContainerListOpts};
     use docker_api::Docker;
@@ -46,6 +47,7 @@ pub fn get_ctn_id_from_name(ctn_name: &str) -> Result<String> {
     })
 }
 
+/// Return a recv side of a channel, will get notified when Ctrl+c is pressed
 pub fn ctrlc_chan() -> Result<Receiver<()>> {
     // Creates a channel of bounded capacity
     let (sender, receiver) = bounded(10);

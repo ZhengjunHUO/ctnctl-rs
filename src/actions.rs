@@ -38,6 +38,7 @@ pub struct Protocol {
     udp: Option<u16>,
 }
 
+/// Create a directory in bpf's pseudo file system to hold container's pinned resources
 pub fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
     use std::fs::create_dir;
     use std::os::fd::AsRawFd;
@@ -103,6 +104,7 @@ pub fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Remove container's related resources bpf's pseudo file system
 pub fn free_ctn_resources(ctn_name: &str) -> Result<()> {
     use std::fs::remove_dir;
 
@@ -139,6 +141,7 @@ pub fn free_ctn_resources(ctn_name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Apply new firewall rule to container based on client's input via cli
 pub fn update_rule(
     ctn_name: &str,
     direction: &Direction,
@@ -203,6 +206,7 @@ pub fn update_rule(
     Ok(())
 }
 
+/// List container's active firewall rule
 pub fn show_rules(ctn_name: &str) -> Result<()> {
     let ctn_id = get_ctn_id_from_name(&ctn_name)?;
 
@@ -257,6 +261,7 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Watch the container's ingress/egress network flow
 pub fn follow(ctn_name: &str) -> Result<()> {
     let ctn_id = get_ctn_id_from_name(&ctn_name)?;
     prepare_ctn_dir(&ctn_id)?;
