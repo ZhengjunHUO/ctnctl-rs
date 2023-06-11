@@ -246,9 +246,9 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
             //let value = map.lookup(&key, MapFlags::ANY)?;
             //println!("  {:?}", value.unwrap())
             if is_l3 {
-                println!("  - {}", u32_to_ipv4(key)?);
+                println!("  - {}", u32_to_ipv4(&key)?);
             } else {
-                println!("  - {}", u64_to_skt(key)?);
+                println!("  - {}", u64_to_skt(&key)?);
             }
         }
         println!("");

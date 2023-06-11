@@ -21,7 +21,7 @@ pub fn skt_to_u64(ip: &str, port: u16, is_udp: bool) -> Result<[u8; 8]> {
     Ok(rslt)
 }
 
-pub fn u32_to_ipv4(v: Vec<u8>) -> Result<String> {
+pub fn u32_to_ipv4(v: &[u8]) -> Result<String> {
     if v.len() != 4 {
         bail!("Unexpected key stored in the map: {:?}", v)
     }
@@ -30,7 +30,7 @@ pub fn u32_to_ipv4(v: Vec<u8>) -> Result<String> {
     Ok(ip.to_string())
 }
 
-pub fn u64_to_skt(v: Vec<u8>) -> Result<String> {
+pub fn u64_to_skt(v: &[u8]) -> Result<String> {
     if v.len() != 8 {
         bail!("Unexpected key stored in the map: {:?}", v)
     }
@@ -110,4 +110,35 @@ pub fn get_rule_maps() -> Vec<&'static str> {
 
 pub fn get_ctn_bpf_path(ctn_id: &str) -> String {
     format!("{}/{}", BPF_PATH, ctn_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ipv4_u32_translation() {
+        let ip = "172.16.0.10";
+        let expect: [u8; 4] = [172, 16, 0, 10];
+        let rslt = ipv4_to_u32(&ip).expect("Failed to parse ip");
+        assert_eq!(rslt.len(), 4);
+        assert_eq!(rslt, expect);
+
+        let restored = u32_to_ipv4(&rslt).expect("Failed to restore back to ip");
+        assert_eq!(ip, restored);
+    }
+
+    #[test]
+    fn test_skt_u64_translation() {
+        let ip = "172.17.0.3";
+        // 8088 => 00011111 10011000
+        let expect: [u8; 8] = [172, 17, 0, 3, 31, 152, 17, 0];
+        let rslt = skt_to_u64(&ip, 8088, true).expect("Failed to parse ip");
+        assert_eq!(rslt.len(), 8);
+        assert_eq!(rslt, expect);
+
+        let restored = u64_to_skt(&rslt).expect("Failed to restore back to ip:port");
+        let expect_output = "172.17.0.3:8088 (UDP)";
+        assert_eq!(restored, expect_output);
+    }
 }
