@@ -39,7 +39,7 @@ pub struct Protocol {
 }
 
 /// Create a directory in bpf's pseudo file system to hold container's pinned resources
-pub fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
+fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
     use std::fs::create_dir;
     use std::os::fd::AsRawFd;
 

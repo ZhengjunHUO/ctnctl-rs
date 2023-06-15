@@ -12,9 +12,11 @@ exclude = ["docs/"]
 [dependencies]
 anyhow = "1.0.71"
 clap = { version = "4.2.7", features = ["derive"] }
+containers-api = "0.9.0"
 crossbeam-channel = "0.5.8"
 ctrlc = "3.3.1"
-docker-api = "0.12.2"
+docker-api = "0.14"
+futures-util = { version = "0.3", features = ["io"] }
 libbpf-rs = { git = "https://github.com/ZhengjunHUO/libbpf-rs.git", branch = "allow-lookup-inside-queue" }
 libc = "0.2.142"
 tokio = { version = "1.28.1", features = ["rt"] }
