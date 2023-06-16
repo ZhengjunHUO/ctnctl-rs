@@ -65,9 +65,14 @@ struct {
 } data_flow SEC(".maps");
 
 /* apply saved rules to ingress/egress packets, drop the packet if match */
-static inline int filter_packet(struct __sk_buff *skb, bool isIngress) {
+static inline int filter_packet(struct __sk_buff *skb) {
     void *data = (void *)(long)skb->data;
     void *data_end = (void *)(long)skb->data_end;
+
+    bool isIngress = false;
+    if (skb->ingress_ifindex > 0) {
+        isIngress = true;
+    }
 
     struct iphdr *iphd = data;
     __u32 iphdr_len = sizeof(struct iphdr);
@@ -141,9 +146,9 @@ static inline int filter_packet(struct __sk_buff *skb, bool isIngress) {
 }
 
 SEC("cgroup_skb/ingress")
-int ingress_filter(struct __sk_buff *skb) { return filter_packet(skb, true); }
+int ingress_filter(struct __sk_buff *skb) { return filter_packet(skb); }
 
 SEC("cgroup_skb/egress")
-int egress_filter(struct __sk_buff *skb) { return filter_packet(skb, false); }
+int egress_filter(struct __sk_buff *skb) { return filter_packet(skb); }
 
 char __license[] SEC("license") = "Dual MIT/GPL";
