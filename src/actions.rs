@@ -10,7 +10,8 @@ use anyhow::Result;
 use clap::Args;
 use crossbeam_channel::{select, tick};
 use firewall::*;
-use libbpf_rs::{Link, Map, MapFlags};
+use libbpf_rs::{Link, Map, MapFlags, TcHookBuilder};
+use libbpf_rs::{TC_CUSTOM, TC_EGRESS, TC_H_CLSACT, TC_H_MIN_INGRESS, TC_INGRESS};
 use log::debug;
 use std::path::Path;
 use std::time::Duration;
@@ -74,19 +75,22 @@ fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
     let cgroup_fd = f.as_raw_fd();
 
     // (2.a) Get loaded programs and attach to the cgroup, then pin to the fs
-    let mut eg_link = obj.progs_mut().egress_filter().attach_cgroup(cgroup_fd)?;
+    //    let mut eg_link = obj.progs_mut().egress_filter().attach_cgroup(cgroup_fd)?;
     // The prog_type and attach_type are inferred from the c program
     // should be CgroupInetEgress here
     //println!("[DEBUG]: Attach type is {:?}", obj.progs().egress_filter().attach_type());
-    eg_link.pin(format!("{}/{}", &ctn_dir, EGRESS_LINK_NAME))?;
+    //    eg_link.pin(format!("{}/{}", &ctn_dir, EGRESS_LINK_NAME))?;
 
-    let mut ig_link = obj.progs_mut().ingress_filter().attach_cgroup(cgroup_fd)?;
-    ig_link.pin(format!("{}/{}", &ctn_dir, INGRESS_LINK_NAME))?;
+    //    let mut ig_link = obj.progs_mut().ingress_filter().attach_cgroup(cgroup_fd)?;
+    //    ig_link.pin(format!("{}/{}", &ctn_dir, INGRESS_LINK_NAME))?;
 
     // (2.b) Get loaded maps and pin to the fs
     let mut maps = obj.maps_mut();
 
     let eg_fw_map = maps.egress_blacklist();
+    //let key = ipv4_to_u32("8.8.8.8")?;
+    //let value = u8::from(true).to_ne_bytes();
+    //eg_fw_map.update(&key, &value, MapFlags::ANY)?;
     // Persist the map on bpf vfs
     eg_fw_map.pin(format!("{}/{}", &ctn_dir, EGRESS_MAP_NAME))?;
 
@@ -101,6 +105,24 @@ fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
 
     let data_flow_map = maps.data_flow();
     data_flow_map.pin(format!("{}/{}", &ctn_dir, DATAFLOW_MAP_NAME))?;
+
+    // create hooks to ingress/egress
+    let ifidx = get_ctn_ifindex(&ctn_id)?;
+    let mut tc_builder = TcHookBuilder::new();
+    tc_builder
+        .fd(obj.progs().tc_filter().fd())
+        .ifindex(ifidx)
+        .replace(true)
+        .handle(1)
+        .priority(1);
+
+    let mut ingress = tc_builder.hook(TC_INGRESS);
+    println!("[DEBUG] Before Egress create.");
+    ingress.create()?;
+    println!("[DEBUG] After Egress create.");
+    println!("[DEBUG] Before Egress attach.");
+    ingress.attach()?;
+    println!("[DEBUG] After Egress attach.");
 
     Ok(())
 }
@@ -118,16 +140,18 @@ pub fn free_ctn_resources(ctn_name: &str) -> Result<()> {
         return Ok(());
     }
 
-    let all_links = vec![EGRESS_LINK_NAME, INGRESS_LINK_NAME];
+    //let all_links = vec![EGRESS_LINK_NAME, INGRESS_LINK_NAME];
     let all_maps = get_all_maps();
 
     // if link is unpinned and map stays, the rules will not applied any more.
+    /*
     for l in all_links {
         let path = format!("{}/{}", ctn_dir, l);
         let mut prog = Link::open(path)?;
         prog.unpin()?;
         debug!("Unpinned link {}", l);
     }
+    */
 
     // if map is unpinned and link stays, the rules is still in effect ?!
     for m in all_maps {
@@ -135,6 +159,18 @@ pub fn free_ctn_resources(ctn_name: &str) -> Result<()> {
         let mut map = Map::from_pinned_path(&path)?;
         map.unpin(&path)?;
         debug!("Unpinned map {}", m);
+    }
+
+    let ifidx = get_ctn_ifindex(&ctn_id)?;
+    let builder = CgroupFwSkelBuilder::default();
+    let open = builder.open()?;
+    let obj = open.load()?;
+    let mut all_hooks = libbpf_rs::TcHook::new(obj.progs().tc_filter().fd());
+    all_hooks
+        .ifindex(ifidx)
+        .attach_point(TC_EGRESS | TC_INGRESS);
+    if let Err(e) = all_hooks.destroy() {
+        println!("Error occurred when destroying the hooks: {}", e);
     }
 
     remove_dir(ctn_dir_path)?;
@@ -196,12 +232,34 @@ pub fn update_rule(
     let fw_map = rule.map()?;
     let key = rule.key()?;
 
+    let builder = CgroupFwSkelBuilder::default();
+    let open = builder.open()?;
+    let mut obj = open.load()?;
+    let progs = obj.progs();
+    let ifidx = get_ctn_ifindex(&ctn_id)?;
+
+    let mut tc_builder = TcHookBuilder::new();
+    tc_builder
+        .fd(progs.tc_filter().fd())
+        .ifindex(ifidx)
+        .replace(true)
+        .handle(1)
+        .priority(1);
+
+    let mut ingress = tc_builder.hook(TC_INGRESS);
+    //let mut custom = tc_builder.hook(TC_CUSTOM);
+    //custom.parent(TC_H_CLSACT, TC_H_MIN_INGRESS).handle(2);
+
     // Apply the firewall rule
     if is_block {
         let value = u8::from(true).to_ne_bytes();
         fw_map.update(&key, &value, MapFlags::ANY)?;
+        println!("[DEBUG] Before Ingress attach.");
+        ingress.attach()?;
+        println!("[DEBUG] After Ingress attach.");
     } else {
         fw_map.lookup_and_delete(&key)?;
+        ingress.attach()?;
     }
 
     Ok(())
