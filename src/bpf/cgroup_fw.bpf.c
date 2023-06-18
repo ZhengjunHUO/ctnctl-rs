@@ -118,14 +118,14 @@ static inline int filter_packet(struct __sk_buff *skb) {
     bool isBannedL3;
     bool isBannedL4;
     if (isIngress) {
-        bpf_printk("Ingress from %lu", iphd->saddr);
+        //bpf_printk("Ingress from %lu", iphd->saddr);
         s.addr = p.saddr;
         // we don't care source port
         s.port = p.dport;
         isBannedL3 = bpf_map_lookup_elem(&ingress_blacklist, &iphd->saddr);
         isBannedL4 = bpf_map_lookup_elem(&ingress_l4_blacklist, &s);
     } else {
-        bpf_printk("Egress to %lu", iphd->daddr);
+        //bpf_printk("Egress to %lu", iphd->daddr);
         s.addr = p.daddr;
         s.port = p.dport;
         isBannedL3 = bpf_map_lookup_elem(&egress_blacklist, &iphd->daddr);
