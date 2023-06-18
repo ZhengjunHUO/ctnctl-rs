@@ -5,6 +5,7 @@
 #include <netinet/udp.h>
 #include <stdbool.h>
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
 
 /* store network packet's info */
 typedef struct {
@@ -118,14 +119,19 @@ static inline int filter_packet(struct __sk_buff *skb) {
     bool isBannedL3;
     bool isBannedL4;
     if (isIngress) {
-        //bpf_printk("Ingress from %lu", iphd->saddr);
+        //bpf_printk("Ingress %lu <- %lu", iphd->daddr, iphd->saddr);
+        //__u32 src_addr = bpf_ntohl(iphd->saddr);
+        //__u32 dst_addr = bpf_ntohl(iphd->daddr);
+        //bpf_printk("Ingress stdz %lu <- %lu", dst_addr, src_addr);
         s.addr = p.saddr;
-        // we don't care source port
         s.port = p.dport;
         isBannedL3 = bpf_map_lookup_elem(&ingress_blacklist, &iphd->saddr);
         isBannedL4 = bpf_map_lookup_elem(&ingress_l4_blacklist, &s);
     } else {
-        //bpf_printk("Egress to %lu", iphd->daddr);
+        //bpf_printk("Egress %lu -> %lu", iphd->saddr, iphd->daddr);
+        //__u32 src_addr = bpf_ntohl(iphd->saddr);
+        //__u32 dst_addr = bpf_ntohl(iphd->daddr);
+        //bpf_printk("Egress %lu -> %lu", src_addr, dst_addr);
         s.addr = p.daddr;
         s.port = p.dport;
         isBannedL3 = bpf_map_lookup_elem(&egress_blacklist, &iphd->daddr);
