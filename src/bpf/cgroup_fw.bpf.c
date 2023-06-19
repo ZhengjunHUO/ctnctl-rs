@@ -89,7 +89,7 @@ static inline int filter_packet(struct __sk_buff *skb, bool isTc) {
 
     __u32 iphdr_len = sizeof(struct iphdr);
     // avoid verifier's complain
-    if (data + iphdr_len > data_end)
+    if ((void *)iphd + iphdr_len > data_end)
         return 1;
 
     skt s;
