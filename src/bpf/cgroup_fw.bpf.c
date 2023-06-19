@@ -1,4 +1,6 @@
 #include <linux/bpf.h>
+#include <linux/pkt_cls.h>
+#include <linux/if_ether.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -66,7 +68,7 @@ struct {
 } data_flow SEC(".maps");
 
 /* apply saved rules to ingress/egress packets, drop the packet if match */
-static inline int filter_packet(struct __sk_buff *skb) {
+static inline int filter_packet(struct __sk_buff *skb, bool isTc) {
     void *data = (void *)(long)skb->data;
     void *data_end = (void *)(long)skb->data_end;
 
@@ -76,6 +78,15 @@ static inline int filter_packet(struct __sk_buff *skb) {
     }
 
     struct iphdr *iphd = data;
+    if (isTc) {
+        struct ethhdr *ethhd = (struct ethhdr *)(void *)(long)skb->data;
+        __u32 eth_len = sizeof(struct ethhdr);
+        if ((void *)ethhd + eth_len > data_end) {
+            return 1;
+        }
+        iphd = data + eth_len;
+    }
+
     __u32 iphdr_len = sizeof(struct iphdr);
     // avoid verifier's complain
     if (data + iphdr_len > data_end)
@@ -119,19 +130,19 @@ static inline int filter_packet(struct __sk_buff *skb) {
     bool isBannedL3;
     bool isBannedL4;
     if (isIngress) {
-        //bpf_printk("Ingress %lu <- %lu", iphd->daddr, iphd->saddr);
+        // bpf_printk("Ingress %lu <- %lu", iphd->daddr, iphd->saddr);
         //__u32 src_addr = bpf_ntohl(iphd->saddr);
         //__u32 dst_addr = bpf_ntohl(iphd->daddr);
-        //bpf_printk("Ingress stdz %lu <- %lu", dst_addr, src_addr);
+        // bpf_printk("Ingress stdz %lu <- %lu", dst_addr, src_addr);
         s.addr = p.saddr;
         s.port = p.dport;
         isBannedL3 = bpf_map_lookup_elem(&ingress_blacklist, &iphd->saddr);
         isBannedL4 = bpf_map_lookup_elem(&ingress_l4_blacklist, &s);
     } else {
-        //bpf_printk("Egress %lu -> %lu", iphd->saddr, iphd->daddr);
+        // bpf_printk("Egress %lu -> %lu", iphd->saddr, iphd->daddr);
         //__u32 src_addr = bpf_ntohl(iphd->saddr);
         //__u32 dst_addr = bpf_ntohl(iphd->daddr);
-        //bpf_printk("Egress %lu -> %lu", src_addr, dst_addr);
+        // bpf_printk("Egress %lu -> %lu", src_addr, dst_addr);
         s.addr = p.daddr;
         s.port = p.dport;
         isBannedL3 = bpf_map_lookup_elem(&egress_blacklist, &iphd->daddr);
@@ -152,9 +163,18 @@ static inline int filter_packet(struct __sk_buff *skb) {
 }
 
 SEC("cgroup_skb/ingress")
-int ingress_filter(struct __sk_buff *skb) { return filter_packet(skb); }
+int ingress_filter(struct __sk_buff *skb) { return filter_packet(skb, false); }
 
 SEC("cgroup_skb/egress")
-int egress_filter(struct __sk_buff *skb) { return filter_packet(skb); }
+int egress_filter(struct __sk_buff *skb) { return filter_packet(skb, false); }
+
+SEC("tc")
+int tc_filter(struct __sk_buff *skb) {
+    if (filter_packet(skb, true) == 0) {
+        return TC_ACT_SHOT;
+    }
+
+    return TC_ACT_UNSPEC;
+}
 
 char __license[] SEC("license") = "Dual MIT/GPL";
