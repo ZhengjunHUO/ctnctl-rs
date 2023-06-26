@@ -38,6 +38,8 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
+    env_logger::init();
+
     let cli = Cli::parse();
     let ctn_name;
 

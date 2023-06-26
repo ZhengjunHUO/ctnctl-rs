@@ -16,9 +16,11 @@ containers-api = "0.9.0"
 crossbeam-channel = "0.5.8"
 ctrlc = "3.3.1"
 docker-api = "0.14"
+env_logger = "0.10.0"
 futures-util = { version = "0.3", features = ["io"] }
 libbpf-rs = { git = "https://github.com/ZhengjunHUO/libbpf-rs.git", branch = "allow-lookup-inside-queue" }
 libc = "0.2.142"
+log = "0.4.19"
 tokio = { version = "1.28.1", features = ["rt"] }
 
 [build-dependencies]

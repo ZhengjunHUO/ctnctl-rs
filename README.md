@@ -43,7 +43,7 @@ $ docker exec -ti ctn1 curl 172.17.0.3:8000
 $ sudo ./target/debug/ctnctl-rs unblock --to 8.8.4.4 ctn1
 
 # Remove all rules applied to the container
-$ sudo ./target/debug/ctnctl-rs clear ctn1
+$ sudo RUST_LOG=debug ./target/debug/ctnctl-rs clear ctn1
 
 # When container doesn't exist
 $ sudo ./target/debug/ctnctl-rs clear rust

@@ -11,6 +11,7 @@ use clap::Args;
 use crossbeam_channel::{select, tick};
 use firewall::*;
 use libbpf_rs::{Link, Map, MapFlags};
+use log::debug;
 use std::path::Path;
 use std::time::Duration;
 
@@ -48,7 +49,7 @@ fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
     let ctn_dir_path = Path::new(&ctn_dir);
     if ctn_dir_path.is_dir() {
         // return if the dir is already there
-        //println!("[DEBUG] Dir {:?} already exists.", ctn_dir_path);
+        debug!("Dir {:?} already exists.", ctn_dir_path);
         return Ok(());
     }
 
@@ -113,7 +114,7 @@ pub fn free_ctn_resources(ctn_name: &str) -> Result<()> {
     let ctn_dir_path = Path::new(&ctn_dir);
     if !ctn_dir_path.try_exists()? {
         // return if the dir is already there
-        //println!("[DEBUG] Dir {:?} already deleted.", ctn_dir_path);
+        debug!("Dir {:?} already deleted.", ctn_dir_path);
         return Ok(());
     }
 
@@ -125,7 +126,7 @@ pub fn free_ctn_resources(ctn_name: &str) -> Result<()> {
         let path = format!("{}/{}", ctn_dir, l);
         let mut prog = Link::open(path)?;
         prog.unpin()?;
-        println!("[DEBUG] Unpinned link {}", l);
+        debug!("Unpinned link {}", l);
     }
 
     // if map is unpinned and link stays, the rules is still in effect ?!
@@ -133,7 +134,7 @@ pub fn free_ctn_resources(ctn_name: &str) -> Result<()> {
         let path = format!("{}/{}", ctn_dir, m);
         let mut map = Map::from_pinned_path(&path)?;
         map.unpin(&path)?;
-        println!("[DEBUG] Unpinned map {}", m);
+        debug!("Unpinned map {}", m);
     }
 
     remove_dir(ctn_dir_path)?;
@@ -160,7 +161,7 @@ pub fn update_rule(
 
     if !is_block && !ctn_dir_path.try_exists()? {
         // return if the dir doesn't exist
-        println!("No rules applied to {}.", ctn_name);
+        println!("[INFO] No rules applied to {}.", ctn_name);
         return Ok(());
     }
 
@@ -216,7 +217,7 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
     let ctn_dir_path = Path::new(&ctn_dir);
     if !ctn_dir_path.try_exists()? {
         // return if the dir doesn't exist
-        println!("No rules applied to {}.", ctn_name);
+        println!("[INFO] No rules applied to {}.", ctn_name);
         return Ok(());
     }
 
