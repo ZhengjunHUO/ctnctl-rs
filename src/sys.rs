@@ -48,6 +48,7 @@ pub fn get_ctn_id_from_name(ctn_name: &str) -> Result<String> {
     })
 }
 
+#[allow(dead_code)]
 /// Retrieve container's network interface's index at host side
 pub fn get_ctn_ifindex(ctn_id: &str) -> Result<i32> {
     use containers_api::conn::tty::TtyChunk;

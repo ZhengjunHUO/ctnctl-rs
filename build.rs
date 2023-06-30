@@ -2,7 +2,7 @@ fn main() {
     build_and_generate();
 }
 
-#[cfg(feature = "libbpf-cargo")]
+#[cfg(feature = "build-skeleton")]
 fn build_and_generate() {
     use libbpf_cargo::SkeletonBuilder;
     use std::env;
@@ -19,5 +19,5 @@ fn build_and_generate() {
     println!("cargo:rerun-if-changed={c_prog}");
 }
 
-#[cfg(not(feature = "libbpf-cargo"))]
+#[cfg(not(feature = "build-skeleton"))]
 fn build_and_generate() {}
