@@ -1,6 +1,5 @@
 use anyhow::{bail, Result};
 use crossbeam_channel::{bounded, Receiver};
-use ctrlc;
 use docker_api::Docker;
 use futures_util::StreamExt;
 use tokio::runtime::Runtime;
@@ -36,7 +35,7 @@ pub fn get_ctn_id_from_name(ctn_name: &str) -> Result<String> {
             .await
         {
             Ok(ctns) => {
-                if ctns.len() < 1 {
+                if ctns.is_empty() {
                     bail!("Container {} not found !", ctn_name);
                 }
 

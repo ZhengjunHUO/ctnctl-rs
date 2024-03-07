@@ -109,7 +109,7 @@ fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
 pub fn free_ctn_resources(ctn_name: &str) -> Result<()> {
     use std::fs::remove_dir;
 
-    let ctn_id = get_ctn_id_from_name(&ctn_name)?;
+    let ctn_id = get_ctn_id_from_name(ctn_name)?;
     let ctn_dir = get_ctn_bpf_path(&ctn_id);
     let ctn_dir_path = Path::new(&ctn_dir);
     if !ctn_dir_path.try_exists()? {
@@ -150,7 +150,7 @@ pub fn update_rule(
     is_block: bool,
 ) -> Result<()> {
     // Create a folder and store the pinned maps for the container if not exist yet
-    let ctn_id = get_ctn_id_from_name(&ctn_name)?;
+    let ctn_id = get_ctn_id_from_name(ctn_name)?;
 
     if is_block {
         prepare_ctn_dir(&ctn_id)?;
@@ -183,11 +183,11 @@ pub fn update_rule(
 
     match (&direction.to, &direction.from) {
         (Some(eg), None) => {
-            builder = builder.ip(&eg);
+            builder = builder.ip(eg);
         }
         (None, Some(ing)) => {
             builder.is_ingress = true;
-            builder = builder.ip(&ing);
+            builder = builder.ip(ing);
         }
         _ => unreachable!(),
     };
@@ -209,7 +209,7 @@ pub fn update_rule(
 
 /// List container's active firewall rule
 pub fn show_rules(ctn_name: &str) -> Result<()> {
-    let ctn_id = get_ctn_id_from_name(&ctn_name)?;
+    let ctn_id = get_ctn_id_from_name(ctn_name)?;
 
     //use libbpf_rs::MapFlags;
     let ctn_dir = get_ctn_bpf_path(&ctn_id);
@@ -256,7 +256,7 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
                 println!("  - {}", u64_to_skt(&key)?);
             }
         }
-        println!("");
+        println!();
     }
 
     Ok(())
@@ -264,7 +264,7 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
 
 /// Watch the container's ingress/egress network flow
 pub fn follow(ctn_name: &str) -> Result<()> {
-    let ctn_id = get_ctn_id_from_name(&ctn_name)?;
+    let ctn_id = get_ctn_id_from_name(ctn_name)?;
     prepare_ctn_dir(&ctn_id)?;
 
     let ctn_dir = get_ctn_bpf_path(&ctn_id);

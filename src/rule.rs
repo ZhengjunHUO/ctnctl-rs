@@ -15,32 +15,24 @@ pub struct Rule {
 impl Rule {
     pub fn map(&self) -> Result<Map> {
         match (self.is_l4, self.is_ingress) {
-            (true, true) => {
-                return Ok(Map::from_pinned_path(format!(
-                    "{}/{}",
-                    self.ctn_dir, INGRESS_L4_MAP_NAME
-                ))?)
-            }
-            (true, false) => {
-                return Ok(Map::from_pinned_path(format!(
-                    "{}/{}",
-                    self.ctn_dir, EGRESS_L4_MAP_NAME
-                ))?)
-            }
+            (true, true) => Ok(Map::from_pinned_path(format!(
+                "{}/{}",
+                self.ctn_dir, INGRESS_L4_MAP_NAME
+            ))?),
+            (true, false) => Ok(Map::from_pinned_path(format!(
+                "{}/{}",
+                self.ctn_dir, EGRESS_L4_MAP_NAME
+            ))?),
             // Open the pinned map for ingress rules inside the container's folder
-            (false, true) => {
-                return Ok(Map::from_pinned_path(format!(
-                    "{}/{}",
-                    self.ctn_dir, INGRESS_MAP_NAME
-                ))?)
-            }
+            (false, true) => Ok(Map::from_pinned_path(format!(
+                "{}/{}",
+                self.ctn_dir, INGRESS_MAP_NAME
+            ))?),
             // Open the pinned map for egress rules inside the container's folder
-            (false, false) => {
-                return Ok(Map::from_pinned_path(format!(
-                    "{}/{}",
-                    self.ctn_dir, EGRESS_MAP_NAME
-                ))?)
-            }
+            (false, false) => Ok(Map::from_pinned_path(format!(
+                "{}/{}",
+                self.ctn_dir, EGRESS_MAP_NAME
+            ))?),
         }
     }
 
@@ -48,11 +40,11 @@ impl Rule {
         match self.is_l4 {
             true => {
                 let k = skt_to_u64(&self.ip, self.port, self.is_udp)?;
-                return Ok(Vec::from(k));
+                Ok(Vec::from(k))
             }
             false => {
                 let k = ipv4_to_u32(&self.ip)?;
-                return Ok(Vec::from(k));
+                Ok(Vec::from(k))
             }
         }
     }

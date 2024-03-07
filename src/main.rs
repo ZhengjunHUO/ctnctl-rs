@@ -41,12 +41,11 @@ fn main() -> Result<()> {
     env_logger::init();
 
     let cli = Cli::parse();
-    let ctn_name;
 
     // strange that the if argument is global in clap, the required should be false
     // a workaround to make it required
-    match cli.container_name {
-        Some(name) => ctn_name = name,
+    let ctn_name = match cli.container_name {
+        Some(name) => name,
         None => {
             let mut cmmd = Cli::command();
             cmmd.error(
@@ -55,20 +54,20 @@ fn main() -> Result<()> {
             )
             .exit();
         }
-    }
+    };
 
     match &cli.subcommand {
         Commands::Block {
             direction,
             protocol,
         } => {
-            actions::update_rule(&ctn_name, &direction, &protocol, true)?;
+            actions::update_rule(&ctn_name, direction, protocol, true)?;
         }
         Commands::Unblock {
             direction,
             protocol,
         } => {
-            actions::update_rule(&ctn_name, &direction, &protocol, false)?;
+            actions::update_rule(&ctn_name, direction, protocol, false)?;
         }
         Commands::Show => {
             actions::show_rules(&ctn_name)?;
