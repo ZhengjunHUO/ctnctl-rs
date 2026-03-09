@@ -106,7 +106,7 @@ static inline int filter_packet(struct __sk_buff *skb, bool isTc) {
     s.proto = iphd->protocol;
 
     if (iphd->protocol == IPPROTO_TCP) {
-        struct tcphdr *tcphd = data + iphdr_len;
+        struct tcphdr *tcphd = (void *)iphd + iphdr_len;
         __u32 tcphdr_len = sizeof(struct tcphdr);
         // avoid verifier's complain
         if ((void *)tcphd + tcphdr_len > data_end)
@@ -117,7 +117,7 @@ static inline int filter_packet(struct __sk_buff *skb, bool isTc) {
     }
 
     if (iphd->protocol == IPPROTO_UDP) {
-        struct udphdr *udphd = data + iphdr_len;
+        struct udphdr *udphd = (void *)iphd + iphdr_len;
         __u32 udphdr_len = sizeof(struct udphdr);
         // avoid verifier's complain
         if ((void *)udphd + udphdr_len > data_end)
