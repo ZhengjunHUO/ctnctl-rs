@@ -6,11 +6,11 @@ use super::*;
 use crate::rule::*;
 use crate::sys::*;
 use crate::utils::*;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Args;
 use crossbeam_channel::{select, tick};
 use firewall::*;
-use libbpf_rs::{Link, Map, MapFlags};
+use libbpf_rs::{Link, Map, MapFlags, TcHook, TcHookBuilder, TC_EGRESS, TC_INGRESS};
 use log::debug;
 use std::path::Path;
 use std::time::Duration;
@@ -39,31 +39,67 @@ pub struct Protocol {
     udp: Option<u16>,
 }
 
-/// Create a directory in bpf's pseudo file system to hold container's pinned resources
+/// Check if the bpf dir already exists and whether it was set up with a different hook mode
+fn check_mode_conflict(ctn_id: &str, ctn_dir: &str, use_tc: bool) -> Result<bool> {
+    let ctn_dir_path = Path::new(ctn_dir);
+    if !ctn_dir_path.is_dir() {
+        return Ok(false);
+    }
+
+    let tc_meta_path = format!("{}/{}", get_tc_meta_dir(ctn_id), TC_META_NAME);
+    let has_tc_meta = Path::new(&tc_meta_path).exists();
+
+    if use_tc && !has_tc_meta {
+        bail!(
+            "Container already has cgroup_skb hooks. Run 'clear' first before switching to TC mode."
+        );
+    }
+    if !use_tc && has_tc_meta {
+        bail!("Container already has TC hooks. Run 'clear' first before switching to cgroup mode.");
+    }
+
+    // Same mode, dir already exists
+    debug!("Dir {:?} already exists.", ctn_dir_path);
+    Ok(true)
+}
+
+/// Pin all BPF maps to the container's bpf directory
+fn pin_maps(obj: &mut CgroupFwSkel<'_>, ctn_dir: &str) -> Result<()> {
+    let mut maps = obj.maps_mut();
+
+    maps.egress_blacklist()
+        .pin(format!("{}/{}", ctn_dir, EGRESS_MAP_NAME))?;
+    maps.egress_l4_blacklist()
+        .pin(format!("{}/{}", ctn_dir, EGRESS_L4_MAP_NAME))?;
+    maps.ingress_blacklist()
+        .pin(format!("{}/{}", ctn_dir, INGRESS_MAP_NAME))?;
+    maps.ingress_l4_blacklist()
+        .pin(format!("{}/{}", ctn_dir, INGRESS_L4_MAP_NAME))?;
+    maps.data_flow()
+        .pin(format!("{}/{}", ctn_dir, DATAFLOW_MAP_NAME))?;
+
+    Ok(())
+}
+
+/// Create a directory in bpf's pseudo file system and attach cgroup_skb programs
 fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
     use std::fs::create_dir;
     use std::os::fd::AsRawFd;
 
-    // (1) Create dir for container
     let ctn_dir = get_ctn_bpf_path(ctn_id);
-    let ctn_dir_path = Path::new(&ctn_dir);
-    if ctn_dir_path.is_dir() {
-        // return if the dir is already there
-        debug!("Dir {:?} already exists.", ctn_dir_path);
+    if check_mode_conflict(ctn_id, &ctn_dir, false)? {
         return Ok(());
     }
 
-    create_dir(ctn_dir_path)?;
+    create_dir(Path::new(&ctn_dir))?;
 
-    // (2) Load bpf programs and maps
+    // Load bpf programs and maps
     let builder = CgroupFwSkelBuilder::default();
     increase_rlimit()?;
-    // Get an opened, pre-load bpf object
     let open = builder.open()?;
-    // Get a loaded bpf object
     let mut obj = open.load()?;
 
-    // Get target cgroup id
+    // Get target cgroup fd
     let f = std::fs::OpenOptions::new()
         .read(true)
         .write(false)
@@ -73,63 +109,113 @@ fn prepare_ctn_dir(ctn_id: &str) -> Result<()> {
         ))?;
     let cgroup_fd = f.as_raw_fd();
 
-    // (2.a) Get loaded programs and attach to the cgroup, then pin to the fs
+    // Attach programs to the cgroup, then pin to the fs
     let mut eg_link = obj.progs_mut().egress_filter().attach_cgroup(cgroup_fd)?;
-    // The prog_type and attach_type are inferred from the c program
-    // should be CgroupInetEgress here
-    //println!("[DEBUG]: Attach type is {:?}", obj.progs().egress_filter().attach_type());
     eg_link.pin(format!("{}/{}", &ctn_dir, EGRESS_LINK_NAME))?;
 
     let mut ig_link = obj.progs_mut().ingress_filter().attach_cgroup(cgroup_fd)?;
     ig_link.pin(format!("{}/{}", &ctn_dir, INGRESS_LINK_NAME))?;
 
-    // (2.b) Get loaded maps and pin to the fs
-    let mut maps = obj.maps_mut();
-
-    let eg_fw_map = maps.egress_blacklist();
-    // Persist the map on bpf vfs
-    eg_fw_map.pin(format!("{}/{}", &ctn_dir, EGRESS_MAP_NAME))?;
-
-    let eg_l4_fw_map = maps.egress_l4_blacklist();
-    eg_l4_fw_map.pin(format!("{}/{}", &ctn_dir, EGRESS_L4_MAP_NAME))?;
-
-    let ig_fw_map = maps.ingress_blacklist();
-    ig_fw_map.pin(format!("{}/{}", &ctn_dir, INGRESS_MAP_NAME))?;
-
-    let ig_l4_fw_map = maps.ingress_l4_blacklist();
-    ig_l4_fw_map.pin(format!("{}/{}", &ctn_dir, INGRESS_L4_MAP_NAME))?;
-
-    let data_flow_map = maps.data_flow();
-    data_flow_map.pin(format!("{}/{}", &ctn_dir, DATAFLOW_MAP_NAME))?;
+    // Pin maps
+    pin_maps(&mut obj, &ctn_dir)?;
 
     Ok(())
 }
 
-/// Remove container's related resources bpf's pseudo file system
+/// Create a directory in bpf's pseudo file system and attach TC programs to host-side veth
+fn prepare_ctn_dir_tc(ctn_id: &str) -> Result<()> {
+    use std::fs::{create_dir, write};
+
+    let ctn_dir = get_ctn_bpf_path(ctn_id);
+    if check_mode_conflict(ctn_id, &ctn_dir, true)? {
+        return Ok(());
+    }
+
+    create_dir(Path::new(&ctn_dir))?;
+
+    // Load bpf programs and maps
+    let builder = CgroupFwSkelBuilder::default();
+    increase_rlimit()?;
+    let open = builder.open()?;
+    let mut obj = open.load()?;
+
+    // Get the host-side veth ifindex for the container
+    let ifindex = get_ctn_ifindex(ctn_id)?;
+    let fd = obj.progs().tc_filter().fd();
+
+    // Create clsact qdisc and attach TC hooks for both directions
+    let mut builder = TcHookBuilder::new();
+    builder.fd(fd).ifindex(ifindex);
+
+    let mut ingress_hook = builder.hook(TC_INGRESS);
+    ingress_hook.create()?;
+    ingress_hook.attach()?;
+    debug!("Attached TC ingress hook on ifindex {}", ifindex);
+
+    let mut egress_hook = builder.hook(TC_EGRESS);
+    egress_hook.create()?;
+    egress_hook.attach()?;
+    debug!("Attached TC egress hook on ifindex {}", ifindex);
+
+    // Pin maps (same names as cgroup mode)
+    pin_maps(&mut obj, &ctn_dir)?;
+
+    // Save ifindex as tc_meta marker for cleanup
+    // bpffs only supports pinned BPF objects, so store metadata on a regular fs
+    let meta_dir = get_tc_meta_dir(ctn_id);
+    std::fs::create_dir_all(&meta_dir)?;
+    write(
+        format!("{}/{}", &meta_dir, TC_META_NAME),
+        ifindex.to_string(),
+    )?;
+
+    Ok(())
+}
+
+/// Remove container's related resources from bpf's pseudo file system
+/// Auto-detects whether the container uses TC or cgroup mode
 pub fn free_ctn_resources(ctn_name: &str) -> Result<()> {
-    use std::fs::remove_dir;
+    use std::fs::{read_to_string, remove_dir, remove_dir_all, remove_file};
 
     let ctn_id = get_ctn_id_from_name(ctn_name)?;
     let ctn_dir = get_ctn_bpf_path(&ctn_id);
     let ctn_dir_path = Path::new(&ctn_dir);
     if !ctn_dir_path.try_exists()? {
-        // return if the dir is already there
         debug!("Dir {:?} already deleted.", ctn_dir_path);
         return Ok(());
     }
 
-    let all_links = vec![EGRESS_LINK_NAME, INGRESS_LINK_NAME];
-    let all_maps = get_all_maps();
+    let meta_dir = get_tc_meta_dir(&ctn_id);
+    let tc_meta_path = format!("{}/{}", meta_dir, TC_META_NAME);
+    let is_tc = Path::new(&tc_meta_path).exists();
 
-    // if link is unpinned and map stays, the rules will not applied any more.
-    for l in all_links {
-        let path = format!("{}/{}", ctn_dir, l);
-        let mut prog = Link::open(path)?;
-        prog.unpin()?;
-        debug!("Unpinned link {}", l);
+    if is_tc {
+        // TC mode: destroy the clsact qdisc (detaches all hooks)
+        let ifindex_str = read_to_string(&tc_meta_path)?;
+        let ifindex: i32 = ifindex_str.trim().parse()?;
+
+        let mut hook = TcHook::new(0);
+        hook.ifindex(ifindex).attach_point(TC_INGRESS | TC_EGRESS);
+        match hook.destroy() {
+            Ok(()) => debug!("Destroyed TC clsact qdisc on ifindex {}", ifindex),
+            Err(e) => debug!("TC destroy (interface may be gone): {}", e),
+        }
+
+        remove_dir_all(&meta_dir)?;
+        debug!("Removed tc_meta dir");
+    } else {
+        // Cgroup mode: unpin links
+        let all_links = vec![EGRESS_LINK_NAME, INGRESS_LINK_NAME];
+        for l in all_links {
+            let path = format!("{}/{}", ctn_dir, l);
+            let mut prog = Link::open(path)?;
+            prog.unpin()?;
+            debug!("Unpinned link {}", l);
+        }
     }
 
-    // if map is unpinned and link stays, the rules is still in effect ?!
+    // Unpin maps (same for both modes)
+    let all_maps = get_all_maps();
     for m in all_maps {
         let path = format!("{}/{}", ctn_dir, m);
         let mut map = Map::from_pinned_path(&path)?;
@@ -148,12 +234,17 @@ pub fn update_rule(
     direction: &Direction,
     protocol: &Protocol,
     is_block: bool,
+    use_tc: bool,
 ) -> Result<()> {
     // Create a folder and store the pinned maps for the container if not exist yet
     let ctn_id = get_ctn_id_from_name(ctn_name)?;
 
     if is_block {
-        prepare_ctn_dir(&ctn_id)?;
+        if use_tc {
+            prepare_ctn_dir_tc(&ctn_id)?;
+        } else {
+            prepare_ctn_dir(&ctn_id)?;
+        }
     }
 
     let ctn_dir = get_ctn_bpf_path(&ctn_id);
@@ -263,9 +354,13 @@ pub fn show_rules(ctn_name: &str) -> Result<()> {
 }
 
 /// Watch the container's ingress/egress network flow
-pub fn follow(ctn_name: &str) -> Result<()> {
+pub fn follow(ctn_name: &str, use_tc: bool) -> Result<()> {
     let ctn_id = get_ctn_id_from_name(ctn_name)?;
-    prepare_ctn_dir(&ctn_id)?;
+    if use_tc {
+        prepare_ctn_dir_tc(&ctn_id)?;
+    } else {
+        prepare_ctn_dir(&ctn_id)?;
+    }
 
     let ctn_dir = get_ctn_bpf_path(&ctn_id);
     let data_flow_map = Map::from_pinned_path(format!("{}/{}", ctn_dir, DATAFLOW_MAP_NAME))?;

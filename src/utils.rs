@@ -148,6 +148,13 @@ pub fn get_ctn_bpf_path(ctn_id: &str) -> String {
     format!("{}/{}", BPF_PATH, ctn_id)
 }
 
+const TC_META_DIR: &str = "/var/run/ctnctl-rs";
+
+/// Return a path for storing TC metadata for a container
+pub fn get_tc_meta_dir(ctn_id: &str) -> String {
+    format!("{}/{}", TC_META_DIR, ctn_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

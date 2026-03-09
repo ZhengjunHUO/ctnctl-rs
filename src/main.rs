@@ -9,6 +9,10 @@ struct Cli {
     #[command(subcommand)]
     subcommand: Commands,
 
+    /// Use TC hook instead of cgroup_skb (attaches to host-side veth)
+    #[arg(long, global = true, default_value_t = false)]
+    tc: bool,
+
     #[arg(global = true, required = false)]
     container_name: Option<String>,
 }
@@ -56,18 +60,20 @@ fn main() -> Result<()> {
         }
     };
 
+    let use_tc = cli.tc;
+
     match &cli.subcommand {
         Commands::Block {
             direction,
             protocol,
         } => {
-            actions::update_rule(&ctn_name, direction, protocol, true)?;
+            actions::update_rule(&ctn_name, direction, protocol, true, use_tc)?;
         }
         Commands::Unblock {
             direction,
             protocol,
         } => {
-            actions::update_rule(&ctn_name, direction, protocol, false)?;
+            actions::update_rule(&ctn_name, direction, protocol, false, use_tc)?;
         }
         Commands::Show => {
             actions::show_rules(&ctn_name)?;
@@ -76,7 +82,7 @@ fn main() -> Result<()> {
             actions::free_ctn_resources(&ctn_name)?;
         }
         Commands::Follow => {
-            actions::follow(&ctn_name)?;
+            actions::follow(&ctn_name, use_tc)?;
         }
     }
     Ok(())
